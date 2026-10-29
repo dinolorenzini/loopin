@@ -50,10 +50,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, roomId 
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <dialog
       ref={dialogRef}
-      className="profile-dialog"
+      className="share-dialog"
       aria-labelledby="share-dialog-title"
       onClose={onClose}
       onClick={(e) => {
@@ -62,65 +64,59 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, roomId 
         }
       }}
     >
-      <div className="profile-modal-content">
-        <div className="profile-modal-header">
-          <div className="modal-title-with-icon">
-            <div className="share-icon-badge">
-              <QrCode size={20} color="var(--primary-accent)" />
-            </div>
+      <div className="share-modal-content">
+        <div className="share-modal-header">
+          <div className="share-title-row">
+            <QrCode size={18} className="text-accent" />
             <div>
-              <h2 id="share-dialog-title" className="modal-title">Share Room</h2>
-              <p className="modal-subtitle">Invite anyone with the link or QR code</p>
+              <h2 id="share-dialog-title" className="share-modal-title">Share Room</h2>
+              <p className="share-modal-desc">Invite others with the link or QR code</p>
             </div>
           </div>
           <button
             type="button"
-            className="modal-close-btn"
+            className="share-close-btn"
             onClick={onClose}
             aria-label="Close dialog"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
         <div className="share-body">
-          <div className="qr-container">
-            <canvas ref={canvasRef} className="qr-canvas" />
-            <span className="qr-caption">Scan to join on mobile</span>
+          <div className="share-qr-wrap">
+            <div className="share-qr-inner">
+              <canvas ref={canvasRef} className="share-qr-canvas" />
+            </div>
+            <span className="share-qr-caption">Scan to join on mobile</span>
           </div>
 
-          <div className="share-input-group">
+          <div className="share-input-row">
             <input
               type="text"
               readOnly
               value={roomUrl}
-              className="text-input share-url-input"
+              className="share-url-field"
               onClick={(e) => (e.target as HTMLInputElement).select()}
+              aria-label="Room URL"
             />
             <button
               type="button"
-              className={`btn btn-copy ${copied ? "btn-copied" : "btn-primary"}`}
+              className="share-copy-action-btn"
               onClick={handleCopy}
             >
-              {copied ? (
-                <>
-                  <Check size={16} /> Copied!
-                </>
-              ) : (
-                <>
-                  <Copy size={16} /> Copy Link
-                </>
-              )}
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              <span>{copied ? "Copied" : "Copy"}</span>
             </button>
           </div>
 
           {typeof navigator !== "undefined" && typeof navigator.share === "function" && (
             <button
               type="button"
-              className="btn btn-secondary full-width-btn"
+              className="share-native-button"
               onClick={handleNativeShare}
             >
-              <Share2 size={16} /> Share via Apps...
+              <Share2 size={14} /> Share via device...
             </button>
           )}
         </div>

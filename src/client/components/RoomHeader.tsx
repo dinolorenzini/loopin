@@ -10,6 +10,7 @@ import {
   BellOff,
   LogOut,
   AlertTriangle,
+  Share2,
 } from "lucide-react";
 import type { User } from "../../server/types";
 import { LoopinLogo } from "./LoopinLogo";
@@ -20,6 +21,7 @@ interface RoomHeaderProps {
   currentUser: User;
   onLeaveRoom: () => void;
   onOpenSettings: (category?: "profile" | "appearance" | "sound") => void;
+  onOpenShare?: () => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
   isSidebarPinned: boolean;
@@ -35,6 +37,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   currentUser,
   onLeaveRoom,
   onOpenSettings,
+  onOpenShare,
   onToggleSidebar,
   isSidebarOpen,
   isSidebarPinned,
@@ -89,21 +92,34 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           <span className="brand-logo-name">Loopin</span>
         </button>
 
-        <button
-          type="button"
-          className="room-name-chip"
-          onClick={handleCopyLink}
-          title={copied ? "Link copied!" : "Copy room link"}
-          aria-label={`Room ${roomId}. Click to copy link.`}
-        >
-          <span className="room-hash-symbol">#</span>
-          <span className="room-title-text">{roomId}</span>
-          {copied ? (
-            <Check size={13} className="text-accent" />
-          ) : (
-            <Copy size={13} className="chip-copy-icon" />
+        <div className="room-name-chip-group">
+          <button
+            type="button"
+            className="room-name-chip"
+            onClick={handleCopyLink}
+            title={copied ? "Link copied!" : "Copy room link"}
+            aria-label={`Room ${roomId}. Click to copy link.`}
+          >
+            <span className="room-hash-symbol">#</span>
+            <span className="room-title-text">{roomId}</span>
+            {copied ? (
+              <Check size={13} className="text-accent" />
+            ) : (
+              <Copy size={13} className="chip-copy-icon" />
+            )}
+          </button>
+          {onOpenShare && (
+            <button
+              type="button"
+              className="room-share-mini-btn"
+              onClick={onOpenShare}
+              title="Show QR code & share"
+              aria-label="Show QR code and share options"
+            >
+              <Share2 size={13} />
+            </button>
           )}
-        </button>
+        </div>
       </div>
 
       {/* 2. Right: Member count + User chip + Overflow menu */}

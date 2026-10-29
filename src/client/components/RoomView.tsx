@@ -47,7 +47,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const initialScrollDoneRef = useRef<boolean>(false);
-  const hasCheckedFirstJoinRef = useRef<boolean>(false);
 
   const { settings } = useSettings();
 
@@ -77,16 +76,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
     onNewMessage,
   });
 
-  // Auto-show share modal if user is the first person in room
-  useEffect(() => {
-    if (status === "connected" && !hasCheckedFirstJoinRef.current) {
-      hasCheckedFirstJoinRef.current = true;
-      const otherActive = users.filter((u) => u.isOnline !== false && u.id !== currentUser.id);
-      if (otherActive.length === 0) {
-        setIsShareOpen(true);
-      }
-    }
-  }, [status, users, currentUser.id]);
 
   const scrollToMessage = useCallback(
     (targetId: string) => {
@@ -232,6 +221,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
         currentUser={currentUser}
         onLeaveRoom={onLeaveRoom}
         onOpenSettings={handleOpenSettings}
+        onOpenShare={() => setIsShareOpen(true)}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isSidebarOpen={isSidebarOpen}
         isSidebarPinned={isSidebarPinned}
