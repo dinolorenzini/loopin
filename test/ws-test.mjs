@@ -11,7 +11,10 @@ async function runTestSuite() {
   console.log("🚀 Starting Loopin E2E WebSocket & Ephemeral Room Verification Test...\n");
 
   const roomName = `test-ephemeral-${Date.now()}`;
-  const wsUrl = `ws://127.0.0.1:8787/api/room/${roomName}/ws`;
+  const baseUrl = process.argv[2] || "http://127.0.0.1:8787";
+  const wsProto = baseUrl.startsWith("https") ? "wss:" : "ws:";
+  const host = baseUrl.replace(/^https?:\/\//, "");
+  const wsUrl = `${wsProto}//${host}/api/room/${roomName}/ws`;
 
   // 1. Client A connects
   console.log("Step 1: Connecting Client A to room #" + roomName);
