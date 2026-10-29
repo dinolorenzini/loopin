@@ -7,10 +7,13 @@
   "scripts": {
     "dev:client": "vite",
     "build:client": "vite build",
-    "dev": "npm run build:client && wrangler dev",
-    "build": "npm run build:client",
-    "deploy": "npm run build:client && wrangler deploy",
+    "dev": "wrangler dev",
+    "build": "vite build",
+    "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

@@ -61,6 +61,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
     editMessage,
     deleteMessage,
     reactMessage,
+    markAsRead,
     sendTyping,
     updateProfile,
   } = useChatRoom({
@@ -68,6 +69,34 @@ export const RoomView: React.FC<RoomViewProps> = ({
     currentUser,
     onNewMessage,
   });
+
+  // Automatically mark incoming messages as read when viewing the room
+  useEffect(() => {
+    if (document.hidden) return;
+    const unreadFromOthers = messages
+      .filter((m) => m.userId !== currentUser.id && (!m.readBy || !m.readBy.includes(currentUser.id)))
+      .map((m) => m.id);
+
+    if (unreadFromOthers.length > 0) {
+      markAsRead(unreadFromOthers);
+    }
+  }, [messages, currentUser.id, markAsRead]);
+
+  // Also mark as read on window focus
+  useEffect(() => {
+    const handleFocus = () => {
+      const unreadFromOthers = messages
+        .filter((m) => m.userId !== currentUser.id && (!m.readBy || !m.readBy.includes(currentUser.id)))
+        .map((m) => m.id);
+
+      if (unreadFromOthers.length > 0) {
+        markAsRead(unreadFromOthers);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [messages, currentUser.id, markAsRead]);
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback((smooth = true) => {

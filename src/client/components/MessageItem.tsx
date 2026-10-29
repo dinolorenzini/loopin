@@ -4,6 +4,7 @@ import {
   Trash2,
   Smile,
   Check,
+  CheckCheck,
   X,
   Clock,
 } from "lucide-react";
@@ -65,6 +66,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  const isRead = Boolean(message.readBy && message.readBy.some((id) => id !== message.userId));
 
   return (
     <div className={`message-row ${isMe ? "message-row-me" : "message-row-other"}`}>
@@ -161,7 +164,27 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                     (edited)
                   </span>
                 )}
-                {isMe && <span className="msg-timestamp-me">{timeFormatted}</span>}
+                <span className={isMe ? "msg-timestamp-me" : "msg-timestamp-bubble"}>{timeFormatted}</span>
+                {isMe && (
+                  <span
+                    className="msg-status-wrap"
+                    title={
+                      message.status === "sending"
+                        ? "Sending..."
+                        : isRead
+                        ? "Read"
+                        : "Delivered"
+                    }
+                  >
+                    {message.status === "sending" ? (
+                      <Clock size={11} className="status-sending-icon" />
+                    ) : isRead ? (
+                      <CheckCheck size={14} className="status-read-icon" />
+                    ) : (
+                      <Check size={13} className="status-delivered-icon" />
+                    )}
+                  </span>
+                )}
               </div>
             </>
           )}

@@ -119,8 +119,9 @@ export class RoomDurableObject extends DurableObject {
           if (text && text.length > 10000) return;
           if (imageBase64 && imageBase64.length > 7000000) return;
 
+          const messageId = data.id || crypto.randomUUID();
           const message: Message = {
-            id: crypto.randomUUID(),
+            id: messageId,
             roomId: this.roomId,
             userId: user.id,
             userName: user.name,
@@ -131,6 +132,8 @@ export class RoomDurableObject extends DurableObject {
             gifUrl: gifUrl || undefined,
             timestamp: Date.now(),
             reactions: {},
+            status: "delivered",
+            readBy: [user.id],
           };
 
           this.messages.push(message);
@@ -142,6 +145,7 @@ export class RoomDurableObject extends DurableObject {
           this.broadcast({
             type: "new_message",
             message,
+            clientTempId: data.id,
           });
           break;
         }
@@ -226,6 +230,33 @@ export class RoomDurableObject extends DurableObject {
             messageId: message.id,
             reactions: message.reactions,
           });
+          break;
+        }
+
+        case "mark_read": {
+          const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+          if (!attachment?.userId || !Array.isArray(data.messageIds)) return;
+
+          const updatedIds: string[] = [];
+          for (const mid of data.messageIds) {
+            const msg = this.messages.find((m) => m.id === mid);
+            if (msg) {
+              if (!msg.readBy) msg.readBy = [msg.userId];
+              if (!msg.readBy.includes(attachment.userId)) {
+                msg.readBy.push(attachment.userId);
+                msg.status = "read";
+                updatedIds.push(mid);
+              }
+            }
+          }
+
+          if (updatedIds.length > 0) {
+            this.broadcast({
+              type: "messages_read",
+              messageIds: updatedIds,
+              userId: attachment.userId,
+            });
+          }
           break;
         }
 

@@ -136,6 +136,21 @@ async function runTestSuite() {
   assert(reactionA && reactionA.reactions["🔥"]?.includes("user-b"), "Reaction should be registered for user-b");
   console.log("✓ Emoji reaction verified on both clients:", reactionA.reactions);
 
+  // 6.5. Client B marks message as read
+  console.log("\nStep 6.5: Client B marks message as read (Delivery & Read receipts)");
+  clientB.send(
+    JSON.stringify({
+      type: "mark_read",
+      messageIds: [textMsg.message.id],
+    })
+  );
+
+  await sleep(150);
+  const readNoticeA = messagesA.find((m) => m.type === "messages_read" && m.messageIds.includes(textMsg.message.id));
+  assert(readNoticeA, "Client A should receive messages_read notification");
+  assert(readNoticeA.userId === "user-b", "Message read event should specify user-b");
+  console.log("✓ Read receipt verified: Client A received read confirmation from user-b!");
+
   // 7. Client A deletes the image message
   console.log("\nStep 7: Deleting message");
   clientA.send(

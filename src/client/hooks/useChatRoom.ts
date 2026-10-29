@@ -106,10 +106,41 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
           }
 
           case "new_message": {
-            setMessages((prev) => [...prev, data.message]);
-            if (onNewMessageRef.current) {
+            setMessages((prev) => {
+              // Reconcile optimistic message if clientTempId matches
+              if (data.clientTempId && prev.some((m) => m.id === data.clientTempId)) {
+                return prev.map((m) => (m.id === data.clientTempId ? data.message : m));
+              }
+              // If already present by id, replace
+              if (prev.some((m) => m.id === data.message.id)) {
+                return prev.map((m) => (m.id === data.message.id ? data.message : m));
+              }
+              return [...prev, data.message];
+            });
+
+            if (onNewMessageRef.current && data.message.userId !== currentUserRef.current.id) {
               onNewMessageRef.current(data.message);
             }
+            break;
+          }
+
+          case "messages_read": {
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (data.messageIds.includes(m.id)) {
+                  const existingReadBy = m.readBy || [m.userId];
+                  const newReadBy = existingReadBy.includes(data.userId)
+                    ? existingReadBy
+                    : [...existingReadBy, data.userId];
+                  return {
+                    ...m,
+                    readBy: newReadBy,
+                    status: newReadBy.some((id) => id !== m.userId) ? "read" : m.status,
+                  };
+                }
+                return m;
+              })
+            );
             break;
           }
 
@@ -187,11 +218,45 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
   // Actions
   const sendMessage = useCallback(
     ({ text, imageBase64, gifUrl }: { text?: string; imageBase64?: string; gifUrl?: string }) => {
-      sendPacket({
-        type: "send_message",
+      const tempId = crypto.randomUUID();
+      const user = currentUserRef.current;
+
+      // Optimistic message append
+      const optMessage: Message = {
+        id: tempId,
+        roomId,
+        userId: user.id,
+        userName: user.name,
+        userColor: user.color,
+        userAvatar: user.avatar,
         text,
         imageBase64,
         gifUrl,
+        timestamp: Date.now(),
+        reactions: {},
+        status: "sending",
+        readBy: [user.id],
+      };
+
+      setMessages((prev) => [...prev, optMessage]);
+
+      sendPacket({
+        type: "send_message",
+        id: tempId,
+        text,
+        imageBase64,
+        gifUrl,
+      });
+    },
+    [roomId, sendPacket]
+  );
+
+  const markAsRead = useCallback(
+    (messageIds: string[]) => {
+      if (!messageIds || messageIds.length === 0) return;
+      sendPacket({
+        type: "mark_read",
+        messageIds,
       });
     },
     [sendPacket]
@@ -258,6 +323,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
     editMessage,
     deleteMessage,
     reactMessage,
+    markAsRead,
     sendTyping,
     updateProfile,
     reconnect: connect,

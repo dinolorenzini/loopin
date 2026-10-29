@@ -839,13 +839,41 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
-  margin-top: 2px;
+  gap: 4px;
+  margin-top: 4px;
+  user-select: none;
 }
 .msg-edited-badge {
   font-size: 10px;
   color: var(--text-muted);
   font-style: italic;
+  margin-right: 2px;
+}
+.msg-timestamp-me {
+  font-size: 11px;
+  color: #71717a;
+  font-weight: 500;
+}
+.msg-timestamp-bubble {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.msg-status-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 1px;
+}
+.status-sending-icon {
+  color: #71717a;
+  animation: spin 1.2s linear infinite;
+}
+.status-delivered-icon {
+  color: #71717a;
+}
+.status-read-icon {
+  color: #0284c7;
 }
 
 /* Message Hover Actions Toolbar */
