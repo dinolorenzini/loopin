@@ -51,7 +51,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, [disabled]);
 
-  // Focus textarea when replyingTo changes
   useEffect(() => {
     if (replyingTo && textareaRef.current) {
       textareaRef.current.focus();
@@ -62,9 +61,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const val = e.target.value;
     setText(val);
 
-    // Auto-resize
+    // Auto-resize up to 160px
     e.target.style.height = "auto";
-    e.target.style.height = `${Math.min(e.target.scrollHeight, 180)}px`;
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
 
     if (val.trim()) {
       onTyping(true);
@@ -116,7 +115,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
-      // Modern IME-safety: prevent premature submission when converting characters
       if (e.nativeEvent.isComposing || (e as any).keyCode === 229) {
         return;
       }
@@ -175,54 +173,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   }, []);
 
   return (
-    <div className="chat-input-wrapper">
-      {/* "Replying to <user>" bar above input with preview and cancel button */}
-      {replyingTo && (
-        <div className="composing-reply-bar">
-          <div
-            className="reply-bar-indicator"
-            style={{ backgroundColor: replyingTo.userColor || "var(--primary-accent)" }}
-          />
-          <Reply
-            size={14}
-            className="reply-bar-icon"
-            style={{ color: replyingTo.userColor || "var(--primary-accent)" }}
-          />
-          <div className="reply-bar-content">
-            <span className="reply-bar-title">
-              Replying to <strong style={{ color: replyingTo.userColor || "inherit" }}>{replyingTo.userName}</strong>
-            </span>
-            <span className="reply-bar-snippet">
-              {replyingTo.text ||
-                (replyingTo.imageBase64
-                  ? "📷 Photo"
-                  : replyingTo.gifUrl
-                  ? "🎬 GIF"
-                  : "Original message")}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="reply-bar-cancel-btn"
-            onClick={onCancelReply}
-            aria-label="Cancel reply"
-            title="Cancel reply (Esc)"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
-
-      {/* Discord-style typing indicator directly above input bar */}
-      <div className={`discord-typing-bar ${typingUsers.length > 0 ? "visible" : ""}`}>
+    <div className="chat-input-container">
+      {/* 1. Dedicated Reserved Typing Indicator Row (Zero Layout Shift) */}
+      <div className="typing-indicator-reserved-row" aria-live="polite">
         {typingUsers.length > 0 && (
-          <>
-            <div className="typing-dots">
-              <span />
-              <span />
-              <span />
-            </div>
-            <span className="typing-label">
+          <div className="typing-content-box">
+            <span className="typing-text-label">
               {typingUsers.length === 1 ? (
                 <strong>{typingUsers[0].name}</strong>
               ) : typingUsers.length === 2 ? (
@@ -236,23 +192,48 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               )}{" "}
               {typingUsers.length === 1 ? "is" : "are"} typing...
             </span>
-          </>
+          </div>
         )}
       </div>
 
-      {/* Pending image preview */}
+      {/* 2. Replying to banner */}
+      {replyingTo && (
+        <div className="replying-banner-flat">
+          <div className="replying-banner-left">
+            <Reply size={13} className="text-accent" />
+            <span className="replying-banner-label">
+              Replying to <strong style={{ color: replyingTo.userColor }}>{replyingTo.userName}</strong>:
+            </span>
+            <span className="replying-banner-snippet">
+              {replyingTo.text || (replyingTo.imageBase64 ? "Image" : replyingTo.gifUrl ? "GIF" : "")}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="replying-banner-close-btn"
+            onClick={onCancelReply}
+            title="Cancel reply (Esc)"
+            aria-label="Cancel reply"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* 3. Pending image thumbnail */}
       {pendingImage && (
-        <div className="pending-image-preview">
-          <div className="pending-image-card">
-            <img src={pendingImage} alt="Attachment preview" className="pending-image-thumb" />
-            <span className="pending-image-label">Image attached</span>
+        <div className="pending-image-row">
+          <div className="pending-image-chip">
+            <img src={pendingImage} alt="Attachment" className="pending-thumb" />
+            <span className="pending-label">Image attached</span>
             <button
               type="button"
-              className="remove-image-btn"
+              className="pending-remove-btn"
               onClick={() => setPendingImage(null)}
-              title="Remove image"
+              title="Remove attachment"
+              aria-label="Remove attachment"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           </div>
         </div>
@@ -260,8 +241,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
       {/* Popovers */}
       {showEmojiPicker && (
-        <div className="popover-overlay" onClick={() => setShowEmojiPicker(false)}>
-          <div className="popover-anchor" onClick={(e) => e.stopPropagation()}>
+        <div className="popover-backdrop" onClick={() => setShowEmojiPicker(false)}>
+          <div className="popover-content-box" onClick={(e) => e.stopPropagation()}>
             <EmojiPicker
               onSelectEmoji={(emoji) => {
                 setText((prev) => prev + emoji);
@@ -274,8 +255,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       )}
 
       {showGifPicker && (
-        <div className="popover-overlay" onClick={() => setShowGifPicker(false)}>
-          <div className="popover-anchor" onClick={(e) => e.stopPropagation()}>
+        <div className="popover-backdrop" onClick={() => setShowGifPicker(false)}>
+          <div className="popover-content-box" onClick={(e) => e.stopPropagation()}>
             <GifPicker
               onSelectGif={(url) => {
                 let replyRef: ReplyReference | undefined;
@@ -299,7 +280,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       )}
 
-      <div className="chat-input-bar">
+      {/* 4. Compact Main Input Box */}
+      <div className="chat-input-box">
         <input
           ref={fileInputRef}
           type="file"
@@ -308,45 +290,44 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           onChange={handleFileChange}
         />
 
-        <div className="input-actions-left">
+        <div className="input-tools-left">
           <button
             type="button"
-            className="input-tool-btn"
+            className="input-icon-btn"
             onClick={() => fileInputRef.current?.click()}
-            title="Upload Image"
+            title="Attach image"
+            aria-label="Attach image"
             disabled={disabled || isProcessingImage}
           >
-            {isProcessingImage ? (
-              <Loader2 size={18} className="spinner" />
-            ) : (
-              <ImageIcon size={18} />
-            )}
+            {isProcessingImage ? <Loader2 size={16} className="spinner" /> : <ImageIcon size={16} />}
           </button>
 
           <button
             type="button"
-            className={`input-tool-btn ${showGifPicker ? "active" : ""}`}
+            className={`input-icon-btn ${showGifPicker ? "active" : ""}`}
             onClick={() => {
               setShowGifPicker(!showGifPicker);
               setShowEmojiPicker(false);
             }}
-            title="GIF Picker"
+            title="Insert GIF"
+            aria-label="Insert GIF"
             disabled={disabled}
           >
-            <Film size={18} />
+            <Film size={16} />
           </button>
 
           <button
             type="button"
-            className={`input-tool-btn ${showEmojiPicker ? "active" : ""}`}
+            className={`input-icon-btn ${showEmojiPicker ? "active" : ""}`}
             onClick={() => {
               setShowEmojiPicker(!showEmojiPicker);
               setShowGifPicker(false);
             }}
-            title="Emoji Picker"
+            title="Emoji picker"
+            aria-label="Emoji picker"
             disabled={disabled}
           >
-            <Smile size={18} />
+            <Smile size={16} />
           </button>
         </div>
 
@@ -355,27 +336,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           value={text}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder={replyingTo ? `Replying to ${replyingTo.userName}...` : "Message or paste image (Ctrl+V)..."}
-          className="chat-textarea"
+          placeholder={replyingTo ? `Replying to ${replyingTo.userName}...` : "Send a message..."}
+          className="chat-input-textarea"
           rows={1}
           maxLength={2000}
           disabled={disabled}
+          aria-label="Message input"
         />
-
-        {text.length > 1800 && (
-          <span className="char-limit-indicator" title="Character limit: 2000">
-            {text.length}/2000
-          </span>
-        )}
 
         <button
           type="button"
-          className={`input-send-btn ${text.trim() || pendingImage ? "ready" : ""}`}
+          className="chat-send-accent-btn"
           onClick={handleSend}
           disabled={disabled || (!text.trim() && !pendingImage)}
           title="Send message (Enter)"
+          aria-label="Send message"
         >
-          <Send size={16} />
+          <Send size={15} />
         </button>
       </div>
     </div>

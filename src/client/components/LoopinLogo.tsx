@@ -4,7 +4,6 @@ import { useSettings } from "../hooks/useSettings";
 interface LoopinLogoProps {
   size?: number;
   className?: string;
-  glow?: boolean;
 }
 
 export const LoopinLogo: React.FC<LoopinLogoProps> = ({

@@ -22,7 +22,6 @@ interface HomePageProps {
   onJoinRoom: (room: string) => void;
   currentUser: User;
   onUpdateUser: (updates: Partial<Pick<User, "name" | "color">>) => void;
-  onOpenProfile: () => void;
 }
 
 interface RecentRoom {
@@ -103,7 +102,7 @@ export function parseRoomInput(raw: string): string {
 export const HomePage: React.FC<HomePageProps> = ({
   onJoinRoom,
   currentUser,
-  onOpenProfile,
+  onUpdateUser,
 }) => {
   const [mode, setMode] = useState<"join" | "create">("join");
 
@@ -119,6 +118,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsCategory, setSettingsCategory] = useState<"appearance" | "profile" | "background">("appearance");
 
   useEffect(() => {
     try {
@@ -254,8 +254,12 @@ export const HomePage: React.FC<HomePageProps> = ({
         <button
           type="button"
           className="header-icon-btn"
-          onClick={() => setIsSettingsOpen(true)}
+          onClick={() => {
+            setSettingsCategory("appearance");
+            setIsSettingsOpen(true);
+          }}
           title="Open Settings"
+          aria-label="Open Settings"
         >
           <Settings size={18} />
         </button>
@@ -278,7 +282,16 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* Action Card */}
         <div className="home-card">
           {/* User profile bar */}
-          <div className="home-profile-bar" onClick={onOpenProfile}>
+          <div
+            className="home-profile-bar"
+            onClick={() => {
+              setSettingsCategory("profile");
+              setIsSettingsOpen(true);
+            }}
+            role="button"
+            tabIndex={0}
+            title="Edit your display name & color"
+          >
             <span
               className="user-color-dot"
               style={{ backgroundColor: currentUser.color || "var(--primary-accent)" }}
@@ -466,6 +479,9 @@ export const HomePage: React.FC<HomePageProps> = ({
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        initialCategory={settingsCategory}
+        currentUser={currentUser}
+        onUpdateUser={onUpdateUser}
       />
     </div>
   );

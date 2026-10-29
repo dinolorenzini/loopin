@@ -245,6 +245,15 @@ function isSafeUrl(url: string): boolean {
  * Parses inline markdown:
  * `code`, **bold**, *italic*, ~~strikethrough~~, [label](url), bare URLs
  */
+function formatUrlDisplay(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    return `${parsed.hostname}…`;
+  } catch {
+    return rawUrl.length > 28 ? `${rawUrl.slice(0, 26)}…` : rawUrl;
+  }
+}
+
 export function renderInlineMarkdown(text: string): React.ReactNode {
   const inlineRegex =
     /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(~~[^~]+~~)|(\[(?:[^\]]+)\]\((?:https?:\/\/[^\s)]+)\))|(https?:\/\/[^\s]+)/g;
@@ -311,8 +320,9 @@ export function renderInlineMarkdown(text: string): React.ReactNode {
             target="_blank"
             rel="noopener noreferrer"
             className="md-link"
+            title={bareUrl}
           >
-            {bareUrl}
+            {formatUrlDisplay(bareUrl)}
           </a>
         );
       } else {

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { HomePage } from "./components/HomePage";
 import { RoomView } from "./components/RoomView";
-import { ProfileModal } from "./components/ProfileModal";
 import { useUser } from "./hooks/useUser";
 
 export const App: React.FC = () => {
@@ -11,7 +10,6 @@ export const App: React.FC = () => {
     const path = window.location.pathname.replace(/^\/+|\/+$/g, "");
     return path ? path.toLowerCase() : null;
   });
-  const [isGlobalProfileOpen, setIsGlobalProfileOpen] = useState(false);
 
   // Sync with browser history
   useEffect(() => {
@@ -52,17 +50,8 @@ export const App: React.FC = () => {
           onJoinRoom={navigateToRoom}
           currentUser={user}
           onUpdateUser={updateUser}
-          onOpenProfile={() => setIsGlobalProfileOpen(true)}
         />
       )}
-
-      {/* Global Profile Modal when accessed from Home */}
-      <ProfileModal
-        isOpen={isGlobalProfileOpen}
-        onClose={() => setIsGlobalProfileOpen(false)}
-        currentUser={user}
-        onSave={(updates) => updateUser(updates)}
-      />
     </div>
   );
 };
