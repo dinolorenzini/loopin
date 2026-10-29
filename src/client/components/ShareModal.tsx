@@ -35,22 +35,18 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, roomId 
       await navigator.clipboard.writeText(roomUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback
-    }
+    } catch {}
   };
 
   const handleNativeShare = async () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Join my chat room #${roomId} on Loopin`,
-          text: `Jump into this ephemeral chat on Loopin. Messages vanish when everyone disconnects.`,
+          title: `Join room #${roomId} on Loopin`,
+          text: `Join the conversation in #${roomId} on Loopin!`,
           url: roomUrl,
         });
-      } catch {
-        // User cancelled or unsupported
-      }
+      } catch {}
     }
   };
 
@@ -70,7 +66,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, roomId 
         <div className="profile-modal-header">
           <div className="modal-title-with-icon">
             <div className="share-icon-badge">
-              <QrCode size={20} color="#38bdf8" />
+              <QrCode size={20} color="var(--primary-accent)" />
             </div>
             <div>
               <h2 id="share-dialog-title" className="modal-title">Share Room</h2>
@@ -127,13 +123,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, roomId 
               <Share2 size={16} /> Share via Apps...
             </button>
           )}
-
-          <div className="ephemeral-notice-box">
-            <span className="ephemeral-dot" />
-            <span>
-              <strong>Zero Traces:</strong> When all participants leave, all messages, images, and history in this room are permanently deleted.
-            </span>
-          </div>
         </div>
       </div>
     </dialog>

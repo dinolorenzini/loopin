@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from "react";
 import {
-  Sparkles,
   ArrowRight,
-  Shield,
   Zap,
   Clock,
   Trash2,
-  Lock,
-  User as UserIcon,
+  Settings,
 } from "lucide-react";
 import type { User } from "../../server/types";
+import { useSettings } from "../hooks/useSettings";
+import { ChatBackground } from "./ChatBackground";
+import { SettingsModal } from "./SettingsModal";
 
 interface HomePageProps {
   onJoinRoom: (room: string) => void;
   currentUser: User;
-  onUpdateUser: (updates: Partial<Pick<User, "name" | "color" | "avatar">>) => void;
+  onUpdateUser: (updates: Partial<Pick<User, "name" | "color">>) => void;
   onOpenProfile: () => void;
 }
 
@@ -36,11 +36,13 @@ function generateRoomSlug(): string {
 export const HomePage: React.FC<HomePageProps> = ({
   onJoinRoom,
   currentUser,
-  onUpdateUser,
   onOpenProfile,
 }) => {
   const [roomInput, setRoomInput] = useState("");
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const { settings } = useSettings();
 
   useEffect(() => {
     try {
@@ -48,9 +50,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       if (stored) {
         setRecentRooms(JSON.parse(stored));
       }
-    } catch {
-      // Ignore
-    }
+    } catch {}
   }, []);
 
   const handleCreateInstant = () => {
@@ -71,9 +71,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       const existing = recentRooms.filter((r) => r.id !== roomId);
       const updated = [{ id: roomId, name: roomId, visitedAt: Date.now() }, ...existing].slice(0, 5);
       localStorage.setItem("loopin_recent_rooms", JSON.stringify(updated));
-    } catch {
-      // Ignore
-    }
+    } catch {}
     onJoinRoom(roomId);
   };
 
@@ -84,44 +82,54 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="home-container">
-      {/* Background ambient lighting */}
-      <div className="ambient-glow glow-1" />
-      <div className="ambient-glow glow-2" />
+      {/* Background canvas replacing static gradient circles (Item 20) */}
+      <ChatBackground
+        type={settings.background}
+        accentColor={settings.themeColor}
+        noAnimations={settings.noAnimations}
+      />
+
+      {/* Top Bar for Settings */}
+      <header className="home-top-bar">
+        <button
+          type="button"
+          className="header-icon-btn"
+          onClick={() => setIsSettingsOpen(true)}
+          title="Open Settings"
+        >
+          <Settings size={18} />
+        </button>
+      </header>
 
       <main className="home-content">
-        {/* Brand Hero */}
+        {/* Brand Hero (Items 11, 12, 13: Clean SVG without wrap box or sparkle) */}
         <div className="home-hero">
-          <div className="home-logo-wrap">
-            <img src="/favicon.svg" alt="Loopin Logo" className="home-logo" />
-            <div className="logo-sparkle">
-              <Sparkles size={14} color="#38bdf8" />
-            </div>
-          </div>
+          <img src="/favicon.svg" alt="Loopin" className="home-logo-bare" />
           <h1 className="home-title">
-            Loop<span className="text-gradient">in</span>
+            Loop<span className="text-accent">in</span>
           </h1>
           <p className="home-tagline">
-            Instant, ephemeral chat rooms on Cloudflare Workers.
+            Simple, fast, private chat rooms for you and your friends.
             <br />
-            Zero-data logging. All messages vanish when everyone leaves.
+            Create a room, share the link, and jump right in.
           </p>
         </div>
 
         {/* Action Card */}
         <div className="home-card">
-          {/* User profile bar */}
+          {/* User profile bar (Item 3: no avatar emoji, colored name) */}
           <div className="home-profile-bar" onClick={onOpenProfile}>
-            <div
-              className="home-user-avatar"
-              style={{ backgroundColor: currentUser.color }}
-            >
-              <span>{currentUser.avatar || "⚡"}</span>
-            </div>
+            <span
+              className="user-color-dot"
+              style={{ backgroundColor: currentUser.color || "var(--primary-accent)" }}
+            />
             <div className="home-user-details">
               <span className="home-user-label">Chatting as</span>
-              <span className="home-user-name">{currentUser.name}</span>
+              <span className="home-user-name" style={{ color: currentUser.color || "inherit" }}>
+                {currentUser.name}
+              </span>
             </div>
-            <span className="home-user-edit-link">Change</span>
+            <span className="home-user-edit-link">Edit</span>
           </div>
 
           {/* Quick Instant Spin-up */}
@@ -131,7 +139,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             onClick={handleCreateInstant}
           >
             <Zap size={18} />
-            <span>Spin Up Instant Room</span>
+            <span>Create New Room</span>
             <ArrowRight size={16} className="btn-arrow" />
           </button>
 
@@ -192,45 +200,12 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           )}
         </div>
-
-        {/* Feature Highlights */}
-        <div className="home-features-grid">
-          <div className="feature-card">
-            <div className="feature-icon-box">
-              <Shield size={18} color="#34d399" />
-            </div>
-            <h3 className="feature-heading">Zero-Data Logging</h3>
-            <p className="feature-desc">
-              No databases, no tracking cookies, no server persistence. Your privacy is mathematically protected.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-icon-box">
-              <Lock size={18} color="#38bdf8" />
-            </div>
-            <h3 className="feature-heading">Auto-Wipe on Disconnect</h3>
-            <p className="feature-desc">
-              When all users leave a room, Cloudflare Durable Objects immediately cleans and purges every message.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-icon-box">
-              <Zap size={18} color="#c084fc" />
-            </div>
-            <h3 className="feature-heading">Rich Media & Alerts</h3>
-            <p className="feature-desc">
-              Base64 image uploads, instant GIFs, native emoji reactions, Web Notifications, and live title counts.
-            </p>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <footer className="home-footer">
-          <span>Powered 100% by Cloudflare Workers & Durable Objects</span>
-        </footer>
       </main>
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   );
 };

@@ -4,6 +4,8 @@ export interface User {
   color: string;
   avatar?: string;
   joinedAt: number;
+  isFocused?: boolean;
+  lastActiveAt?: number;
 }
 
 export interface MessageReaction {
@@ -25,6 +27,7 @@ export interface Message {
   reactions?: MessageReaction;
   status?: "sending" | "delivered" | "read";
   readBy?: string[]; // userIds of users who have read this message
+  isSystem?: boolean;
 }
 
 export type ClientMessage =
@@ -35,6 +38,8 @@ export type ClientMessage =
   | { type: "react_message"; messageId: string; emoji: string }
   | { type: "mark_read"; messageIds: string[] }
   | { type: "typing"; isTyping: boolean }
+  | { type: "focus_change"; isFocused: boolean; lastActiveAt?: number }
+  | { type: "ping" }
   | { type: "update_profile"; name?: string; color?: string; avatar?: string };
 
 export type ServerMessage =
@@ -42,10 +47,12 @@ export type ServerMessage =
   | { type: "user_joined"; user: User }
   | { type: "user_left"; userId: string; userName: string }
   | { type: "user_updated"; user: User }
+  | { type: "user_focus_changed"; userId: string; isFocused: boolean; lastActiveAt: number }
   | { type: "new_message"; message: Message; clientTempId?: string }
   | { type: "message_edited"; message: Message }
   | { type: "message_deleted"; id: string }
   | { type: "message_reacted"; messageId: string; reactions: MessageReaction }
   | { type: "messages_read"; messageIds: string[]; userId: string }
   | { type: "typing_status"; typingUsers: { id: string; name: string }[] }
+  | { type: "pong" }
   | { type: "error"; message: string };

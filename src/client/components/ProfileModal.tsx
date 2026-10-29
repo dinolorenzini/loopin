@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { User as UserIcon, Check, X } from "lucide-react";
+import { User as UserIcon, Check, X, Palette } from "lucide-react";
 import type { User } from "../../server/types";
 import { USER_COLORS } from "../hooks/useUser";
 
@@ -7,13 +7,8 @@ interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: User;
-  onSave: (updated: Partial<Pick<User, "name" | "color" | "avatar">>) => void;
+  onSave: (updated: Partial<Pick<User, "name" | "color">>) => void;
 }
-
-const AVATAR_OPTIONS = [
-  "⚡", "✨", "🚀", "🪐", "🦊", "🐯", "👾", "🥑", "💎", "🔥", "🔮", "🌊",
-  "🐱", "🐶", "🦁", "🐼", "🦄", "🌈", "🍕", "🍔", "☕", "🎉", "👑", "🎯"
-];
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
@@ -23,14 +18,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState(currentUser.name);
-  const [color, setColor] = useState(currentUser.color);
-  const [avatar, setAvatar] = useState(currentUser.avatar || "⚡");
+  const [color, setColor] = useState(currentUser.color || USER_COLORS[0]);
 
   useEffect(() => {
     if (isOpen) {
       setName(currentUser.name);
-      setColor(currentUser.color);
-      setAvatar(currentUser.avatar || "⚡");
+      setColor(currentUser.color || USER_COLORS[0]);
       if (dialogRef.current && !dialogRef.current.open) {
         dialogRef.current.showModal();
       }
@@ -45,7 +38,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     e.preventDefault();
     const cleanName = name.trim();
     if (cleanName) {
-      onSave({ name: cleanName, color, avatar });
+      onSave({ name: cleanName, color });
       onClose();
     }
   };
@@ -57,7 +50,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       aria-labelledby="profile-dialog-title"
       onClose={onClose}
       onClick={(e) => {
-        // Light dismiss when backdrop is clicked
         if (e.target === dialogRef.current) {
           onClose();
         }
@@ -66,12 +58,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       <div className="profile-modal-content">
         <div className="profile-modal-header">
           <div className="modal-title-with-icon">
-            <div className="profile-preview-avatar" style={{ backgroundColor: color }}>
-              <span>{avatar}</span>
-            </div>
+            <div className="profile-preview-dot" style={{ backgroundColor: color }} />
             <div>
-              <h2 id="profile-dialog-title" className="modal-title">Customize Profile</h2>
-              <p className="modal-subtitle">Your identity in this room</p>
+              <h2 id="profile-dialog-title" className="modal-title">Edit Identity</h2>
+              <p className="modal-subtitle">Your display name and name color in this room</p>
             </div>
           </div>
           <button
@@ -106,23 +96,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           <div className="form-group">
-            <label className="form-label">Avatar Emoji</label>
-            <div className="avatar-selection-grid">
-              {AVATAR_OPTIONS.map((em) => (
-                <button
-                  key={em}
-                  type="button"
-                  className={`avatar-option-btn ${avatar === em ? "selected" : ""}`}
-                  onClick={() => setAvatar(em)}
-                >
-                  {em}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Badge Color</label>
+            <label className="form-label">
+              <Palette size={13} style={{ marginRight: 4, display: "inline" }} /> Name Color
+            </label>
             <div className="color-selection-row">
               {USER_COLORS.map((c) => (
                 <button
@@ -152,7 +128,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               className="btn btn-primary"
               disabled={!name.trim()}
             >
-              Save Profile
+              Save Changes
             </button>
           </div>
         </form>

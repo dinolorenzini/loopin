@@ -9,8 +9,8 @@ import {
   Copy,
   Check,
   LogOut,
-  Sparkles,
-  ShieldCheck,
+  Settings,
+  Pin,
 } from "lucide-react";
 import type { User } from "../../server/types";
 
@@ -21,8 +21,10 @@ interface RoomHeaderProps {
   onLeaveRoom: () => void;
   onOpenShare: () => void;
   onOpenProfile: () => void;
+  onOpenSettings: () => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
+  isSidebarPinned: boolean;
   notificationPermission: NotificationPermission;
   onRequestNotifications: () => void;
   soundMuted: boolean;
@@ -36,8 +38,10 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   onLeaveRoom,
   onOpenShare,
   onOpenProfile,
+  onOpenSettings,
   onToggleSidebar,
   isSidebarOpen,
+  isSidebarPinned,
   notificationPermission,
   onRequestNotifications,
   soundMuted,
@@ -50,14 +54,12 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Ignore
-    }
+    } catch {}
   };
 
   return (
     <header className="room-header">
-      {/* Left: Brand + Room pill */}
+      {/* Left: Brand + Room pill (Item 18: responsive layout fix for <845px) */}
       <div className="header-left">
         <button
           type="button"
@@ -87,14 +89,6 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
         </div>
       </div>
 
-      {/* Center: Ephemeral status */}
-      <div className="header-center">
-        <div className="ephemeral-indicator" title="All messages delete when everyone disconnects">
-          <ShieldCheck size={13} className="text-emerald" />
-          <span>Zero-Data Ephemeral</span>
-        </div>
-      </div>
-
       {/* Right: Controls & actions */}
       <div className="header-right">
         {/* Audio chime toggle */}
@@ -107,7 +101,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           {soundMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
         </button>
 
-        {/* Browser notification opt-in toggle */}
+        {/* Browser notification toggle */}
         <button
           type="button"
           className={`header-icon-btn ${notificationPermission === "granted" ? "active" : ""}`}
@@ -133,31 +127,40 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           <Share2 size={16} />
         </button>
 
+        {/* Settings modal button (Item 14) */}
+        <button
+          type="button"
+          className="header-icon-btn"
+          onClick={onOpenSettings}
+          title="Settings (Themes, Background, Messages)"
+        >
+          <Settings size={16} />
+        </button>
+
         {/* Online Members sidebar button */}
         <button
           type="button"
-          className={`header-pill-btn ${isSidebarOpen ? "selected" : ""}`}
+          className={`header-pill-btn ${isSidebarOpen || isSidebarPinned ? "selected" : ""}`}
           onClick={onToggleSidebar}
-          title="View online members"
+          title={isSidebarPinned ? "Members pinned" : "View online members"}
         >
           <span className="live-dot" />
           <Users size={15} />
           <span className="online-num">{onlineCount}</span>
+          {isSidebarPinned && <Pin size={10} className="pinned-badge-icon" />}
         </button>
 
-        {/* User profile avatar / edit */}
+        {/* User profile button (Item 3: no profile picture, username with color) */}
         <button
           type="button"
           className="user-profile-badge-btn"
           onClick={onOpenProfile}
-          title="Customize my name & avatar"
+          title="Change display name & color"
         >
-          <div
-            className="user-header-avatar"
-            style={{ backgroundColor: currentUser.color }}
-          >
-            {currentUser.avatar || "⚡"}
-          </div>
+          <span
+            className="user-color-dot"
+            style={{ backgroundColor: currentUser.color || "var(--primary-accent)" }}
+          />
           <span className="user-header-name">{currentUser.name}</span>
         </button>
 

@@ -1,28 +1,30 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
-  Sparkles,
+  MessageSquare,
   Users,
-  ShieldCheck,
   UploadCloud,
   Loader2,
   Share2,
 } from "lucide-react";
 import { useChatRoom } from "../hooks/useChatRoom";
 import { useNotifications } from "../hooks/useNotifications";
+import { useSettings } from "../hooks/useSettings";
 import { RoomHeader } from "./RoomHeader";
 import { MessageItem } from "./MessageItem";
 import { ChatInput } from "./ChatInput";
 import { UsersSidebar } from "./UsersSidebar";
 import { ProfileModal } from "./ProfileModal";
+import { SettingsModal } from "./SettingsModal";
 import { ShareModal } from "./ShareModal";
 import { ImageLightbox } from "./ImageLightbox";
+import { ChatBackground } from "./ChatBackground";
 import { processImageToBase64 } from "../utils/image";
 import type { User } from "../../server/types";
 
 interface RoomViewProps {
   roomId: string;
   currentUser: User;
-  onUpdateUser: (updates: Partial<Pick<User, "name" | "color" | "avatar">>) => void;
+  onUpdateUser: (updates: Partial<Pick<User, "name" | "color">>) => void;
   onLeaveRoom: () => void;
 }
 
@@ -33,15 +35,22 @@ export const RoomView: React.FC<RoomViewProps> = ({
   onLeaveRoom,
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarPinned, setIsSidebarPinned] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("loopin_sidebar_pinned") === "true";
+  });
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const initialScrollDoneRef = useRef<boolean>(false);
 
-  // Hook for notifications, title live updating & sound chime
+  const { settings } = useSettings();
+
   const {
     unreadCount,
     permission,
@@ -51,7 +60,6 @@ export const RoomView: React.FC<RoomViewProps> = ({
     onNewMessage,
   } = useNotifications(roomId, currentUser.id);
 
-  // Hook for WebSocket real-time chat room
   const {
     messages,
     users,
@@ -70,7 +78,16 @@ export const RoomView: React.FC<RoomViewProps> = ({
     onNewMessage,
   });
 
-  // Automatically mark incoming messages as read when viewing the room
+  const handleTogglePin = useCallback(() => {
+    setIsSidebarPinned((prev) => {
+      const next = !prev;
+      localStorage.setItem("loopin_sidebar_pinned", String(next));
+      if (next) setIsSidebarOpen(true);
+      return next;
+    });
+  }, []);
+
+  // Mark incoming messages as read
   useEffect(() => {
     if (document.hidden) return;
     const unreadFromOthers = messages
@@ -82,37 +99,31 @@ export const RoomView: React.FC<RoomViewProps> = ({
     }
   }, [messages, currentUser.id, markAsRead]);
 
-  // Also mark as read on window focus
-  useEffect(() => {
-    const handleFocus = () => {
-      const unreadFromOthers = messages
-        .filter((m) => m.userId !== currentUser.id && (!m.readBy || !m.readBy.includes(currentUser.id)))
-        .map((m) => m.id);
-
-      if (unreadFromOthers.length > 0) {
-        markAsRead(unreadFromOthers);
+  // Initial and subsequent scroll handling (Item 17: start chat at bottom, keep DOM at bottom)
+  const scrollToBottom = useCallback((instant = false) => {
+    if (scrollContainerRef.current) {
+      if (instant) {
+        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      } else {
+        messagesEndRef.current?.scrollIntoView({
+          behavior: settings.noAnimations ? "instant" : "smooth",
+          block: "end",
+        });
       }
-    };
-
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [messages, currentUser.id, markAsRead]);
-
-  // Auto-scroll to bottom on new messages
-  const scrollToBottom = useCallback((smooth = true) => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({
-        behavior: smooth ? "smooth" : "auto",
-        block: "end",
-      });
     }
-  }, []);
+  }, [settings.noAnimations]);
 
+  // Ensure initial view starts at bottom immediately without jump
   useEffect(() => {
-    scrollToBottom(true);
+    if (messages.length > 0 && !initialScrollDoneRef.current) {
+      scrollToBottom(true);
+      initialScrollDoneRef.current = true;
+    } else if (messages.length > 0) {
+      scrollToBottom(false);
+    }
   }, [messages.length, scrollToBottom]);
 
-  // Handle Drag & Drop of image anywhere over the room
+  // Drag & drop images
   useEffect(() => {
     let dragCounter = 0;
 
@@ -166,14 +177,20 @@ export const RoomView: React.FC<RoomViewProps> = ({
     };
   }, [sendMessage]);
 
-  // Handle saving profile changes
-  const handleSaveProfile = (updates: Partial<Pick<User, "name" | "color" | "avatar">>) => {
+  const handleSaveProfile = (updates: Partial<Pick<User, "name" | "color">>) => {
     onUpdateUser(updates);
     updateProfile(updates);
   };
 
   return (
-    <div className="room-layout">
+    <div className={`room-layout ${isSidebarPinned ? "has-pinned-sidebar" : ""}`}>
+      {/* Background layer (Item 20) */}
+      <ChatBackground
+        type={settings.background}
+        accentColor={settings.themeColor}
+        noAnimations={settings.noAnimations}
+      />
+
       {/* Header */}
       <RoomHeader
         roomId={roomId}
@@ -182,112 +199,112 @@ export const RoomView: React.FC<RoomViewProps> = ({
         onLeaveRoom={onLeaveRoom}
         onOpenShare={() => setIsShareOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isSidebarOpen={isSidebarOpen}
+        isSidebarPinned={isSidebarPinned}
         notificationPermission={permission}
         onRequestNotifications={requestPermission}
         soundMuted={soundMuted}
         onToggleSound={toggleSound}
       />
 
-      <div className="room-main-area">
-        {/* Messages Stream */}
-        <div className="messages-viewport" ref={scrollContainerRef}>
-          {status === "connecting" && (
-            <div className="connection-banner connecting">
-              <Loader2 size={14} className="spinner" />
-              <span>Connecting to Cloudflare edge room...</span>
-            </div>
-          )}
-
-          {status === "disconnected" && (
-            <div className="connection-banner disconnected">
-              <span>Reconnecting to room #{roomId}...</span>
-            </div>
-          )}
-
-          {/* Empty room placeholder */}
-          {messages.length === 0 ? (
-            <div className="empty-room-state">
-              <div className="empty-logo-wrap">
-                <Sparkles size={28} color="#38bdf8" />
+      <div className="room-content-row">
+        {/* Main Chat Flow */}
+        <div className="room-main-area">
+          <div className="messages-viewport" ref={scrollContainerRef}>
+            {status === "connecting" && (
+              <div className="connection-banner connecting">
+                <Loader2 size={14} className="spinner" />
+                <span>Connecting to room...</span>
               </div>
-              <h2 className="empty-title">Welcome to #{roomId}</h2>
-              <p className="empty-description">
-                You’re the first one here! Share the link with friends to chat.
-              </p>
+            )}
 
-              <div className="empty-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setIsShareOpen(true)}
-                >
-                  <Share2 size={16} /> Share Room Link
-                </button>
+            {status === "disconnected" && (
+              <div className="connection-banner disconnected">
+                <span>Disconnected. Reconnecting to #{roomId}...</span>
               </div>
+            )}
 
-              <div className="ephemeral-callout">
-                <ShieldCheck size={16} color="#34d399" />
-                <span>
-                  <strong>Ephemeral Guarantee:</strong> When all users leave this room, all messages, images, and state are immediately wiped.
-                </span>
+            {/* Empty room placeholder without technical jargon (Item 11) */}
+            {messages.length === 0 ? (
+              <div className="empty-room-state">
+                <div className="empty-logo-wrap">
+                  <MessageSquare size={26} color="var(--primary-accent)" />
+                </div>
+                <h2 className="empty-title">Welcome to #{roomId}</h2>
+                <p className="empty-description">
+                  You’re the first one here! Share the link with friends to start chatting.
+                </p>
+
+                <div className="empty-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setIsShareOpen(true)}
+                  >
+                    <Share2 size={16} /> Share Room Link
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="messages-stream">
-              {messages.map((msg, index) => {
-                const prev = messages[index - 1];
-                const isMe = msg.userId === currentUser.id;
-                const isSameUser = prev && prev.userId === msg.userId && msg.timestamp - prev.timestamp < 120000;
+            ) : (
+              <div className="messages-stream">
+                {messages.map((msg, index) => {
+                  const prev = messages[index - 1];
+                  const next = messages[index + 1];
+                  const isMe = msg.userId === currentUser.id;
 
-                return (
-                  <MessageItem
-                    key={msg.id}
-                    message={msg}
-                    isMe={isMe}
-                    onEdit={editMessage}
-                    onDelete={deleteMessage}
-                    onReact={reactMessage}
-                    onExpandImage={(url) => setLightboxImage(url)}
-                    showAvatar={!isSameUser}
-                  />
-                );
-              })}
-              <div ref={messagesEndRef} className="scroll-anchor" />
-            </div>
-          )}
+                  // Sequential clustering logic (Item 4)
+                  const isFirstInGroup =
+                    !prev ||
+                    prev.userId !== msg.userId ||
+                    prev.isSystem ||
+                    msg.timestamp - prev.timestamp > 300000;
 
-          {/* Typing Indicator */}
-          {typingUsers.length > 0 && (
-            <div className="typing-indicator-bar">
-              <div className="typing-dots">
-                <span />
-                <span />
-                <span />
+                  const isLastInGroup =
+                    !next ||
+                    next.userId !== msg.userId ||
+                    next.isSystem ||
+                    next.timestamp - msg.timestamp > 300000;
+
+                  return (
+                    <MessageItem
+                      key={msg.id}
+                      message={msg}
+                      isMe={isMe}
+                      currentUserId={currentUser.id}
+                      isFirstInGroup={isFirstInGroup}
+                      isLastInGroup={isLastInGroup}
+                      onEdit={editMessage}
+                      onDelete={deleteMessage}
+                      onReact={reactMessage}
+                      onExpandImage={(url) => setLightboxImage(url)}
+                    />
+                  );
+                })}
+                <div ref={messagesEndRef} className="scroll-anchor" />
               </div>
-              <span className="typing-label">
-                {typingUsers.map((u) => u.name).join(", ")}{" "}
-                {typingUsers.length === 1 ? "is" : "are"} typing...
-              </span>
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* Input Bar with Discord-style typing indicator (Item 1) */}
+          <ChatInput
+            onSendMessage={sendMessage}
+            onTyping={sendTyping}
+            disabled={status !== "connected"}
+            typingUsers={typingUsers}
+          />
         </div>
 
-        {/* Input Bar */}
-        <ChatInput
-          onSendMessage={sendMessage}
-          onTyping={sendTyping}
-          disabled={status !== "connected"}
-        />
-
-        {/* Members Sidebar Drawer */}
+        {/* Members Sidebar (Item 9: pinnable to right side) */}
         <UsersSidebar
-          isOpen={isSidebarOpen}
+          isOpen={isSidebarOpen || isSidebarPinned}
           onClose={() => setIsSidebarOpen(false)}
           users={users}
           currentUserId={currentUser.id}
           typingUsers={typingUsers}
+          isPinned={isSidebarPinned}
+          onTogglePin={handleTogglePin}
           onOpenProfile={() => {
             setIsSidebarOpen(false);
             setIsProfileOpen(true);
@@ -299,9 +316,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
       {isDraggingFile && (
         <div className="drag-drop-overlay">
           <div className="drag-drop-card">
-            <UploadCloud size={48} color="#38bdf8" />
+            <UploadCloud size={48} color="var(--primary-accent)" />
             <h3 className="drag-title">Drop image to send</h3>
-            <p className="drag-subtitle">Will be processed as Base64</p>
+            <p className="drag-subtitle">Image will be attached to chat</p>
           </div>
         </div>
       )}
@@ -312,6 +329,11 @@ export const RoomView: React.FC<RoomViewProps> = ({
         onClose={() => setIsProfileOpen(false)}
         currentUser={currentUser}
         onSave={handleSaveProfile}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
 
       <ShareModal

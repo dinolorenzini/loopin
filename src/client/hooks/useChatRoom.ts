@@ -17,9 +17,13 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const pingIntervalRef = useRef<number | null>(null);
   const isMountedRef = useRef<boolean>(true);
   const currentUserRef = useRef<User>(currentUser);
   currentUserRef.current = currentUser;
+
+  // Offline outbox queue for messages sent while disconnected (Item 8)
+  const pendingOutboxRef = useRef<ClientMessage[]>([]);
 
   const onNewMessageRef = useRef(onNewMessage);
   onNewMessageRef.current = onNewMessage;
@@ -27,6 +31,11 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
   const sendPacket = useCallback((packet: ClientMessage) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(packet));
+    } else {
+      // If disconnected and sending a message, queue in outbox
+      if (packet.type === "send_message") {
+        pendingOutboxRef.current.push(packet);
+      }
     }
   }, []);
 
@@ -35,9 +44,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
     if (socketRef.current) {
       try {
         socketRef.current.close();
-      } catch {
-        // Ignore
-      }
+      } catch {}
     }
 
     setStatus("connecting");
@@ -52,11 +59,37 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
     ws.onopen = () => {
       if (!isMountedRef.current) return;
       setStatus("connected");
+
       // Send join event with user profile
       sendPacket({
         type: "join",
-        user: currentUserRef.current,
+        user: {
+          ...currentUserRef.current,
+          isFocused: !document.hidden,
+          lastActiveAt: Date.now(),
+        },
       });
+
+      // Flush any queued offline messages
+      if (pendingOutboxRef.current.length > 0) {
+        const outbox = [...pendingOutboxRef.current];
+        pendingOutboxRef.current = [];
+        for (const pkt of outbox) {
+          try {
+            ws.send(JSON.stringify(pkt));
+          } catch {
+            pendingOutboxRef.current.push(pkt);
+          }
+        }
+      }
+
+      // Start keep-alive ping heartbeat every 25 seconds
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = window.setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "ping" }));
+        }
+      }, 25000);
     };
 
     ws.onmessage = (event) => {
@@ -65,6 +98,9 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
         const data = JSON.parse(event.data) as ServerMessage;
 
         switch (data.type) {
+          case "pong":
+            break;
+
           case "init": {
             setMessages(data.messages || []);
             setUsers(data.users || []);
@@ -87,9 +123,8 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
           case "user_updated": {
             setUsers((prev) =>
-              prev.map((u) => (u.id === data.user.id ? data.user : u))
+              prev.map((u) => (u.id === data.user.id ? { ...u, ...data.user } : u))
             );
-            // Also update user's past messages with latest name/color
             setMessages((prev) =>
               prev.map((m) =>
                 m.userId === data.user.id
@@ -97,7 +132,6 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
                       ...m,
                       userName: data.user.name,
                       userColor: data.user.color,
-                      userAvatar: data.user.avatar,
                     }
                   : m
               )
@@ -105,13 +139,22 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
             break;
           }
 
+          case "user_focus_changed": {
+            setUsers((prev) =>
+              prev.map((u) =>
+                u.id === data.userId
+                  ? { ...u, isFocused: data.isFocused, lastActiveAt: data.lastActiveAt }
+                  : u
+              )
+            );
+            break;
+          }
+
           case "new_message": {
             setMessages((prev) => {
-              // Reconcile optimistic message if clientTempId matches
               if (data.clientTempId && prev.some((m) => m.id === data.clientTempId)) {
                 return prev.map((m) => (m.id === data.clientTempId ? data.message : m));
               }
-              // If already present by id, replace
               if (prev.some((m) => m.id === data.message.id)) {
                 return prev.map((m) => (m.id === data.message.id ? data.message : m));
               }
@@ -174,14 +217,13 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
             break;
           }
         }
-      } catch {
-        // Ignore parse error
-      }
+      } catch {}
     };
 
     ws.onclose = () => {
       if (!isMountedRef.current) return;
       setStatus("disconnected");
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
 
       // Auto-reconnect after 2 seconds
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
@@ -202,18 +244,67 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
     isMountedRef.current = true;
     connect();
 
+    // Listen to network status
+    const handleOnline = () => {
+      if (status !== "connected") {
+        connect();
+      }
+    };
+    window.addEventListener("online", handleOnline);
+
+    // Track tab focus / visibility changes (Items 5, 6, 10)
+    const handleVisibilityChange = () => {
+      const isFocused = !document.hidden;
+      sendPacket({
+        type: "focus_change",
+        isFocused,
+        lastActiveAt: Date.now(),
+      });
+      // If we returned to the tab and connection was lost, reconnect immediately
+      if (isFocused && socketRef.current?.readyState !== WebSocket.OPEN) {
+        connect();
+      }
+    };
+
+    const handleFocus = () => {
+      sendPacket({
+        type: "focus_change",
+        isFocused: true,
+        lastActiveAt: Date.now(),
+      });
+      if (socketRef.current?.readyState !== WebSocket.OPEN) {
+        connect();
+      }
+    };
+
+    const handleBlur = () => {
+      sendPacket({
+        type: "focus_change",
+        isFocused: false,
+        lastActiveAt: Date.now(),
+      });
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+
     return () => {
       isMountedRef.current = false;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+      window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+
       if (socketRef.current) {
         try {
           socketRef.current.close();
-        } catch {
-          // Ignore
-        }
+        } catch {}
       }
     };
-  }, [connect]);
+  }, [connect, sendPacket, status]);
 
   // Actions
   const sendMessage = useCallback(
@@ -221,14 +312,12 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
       const tempId = crypto.randomUUID();
       const user = currentUserRef.current;
 
-      // Optimistic message append
       const optMessage: Message = {
         id: tempId,
         roomId,
         userId: user.id,
         userName: user.name,
         userColor: user.color,
-        userAvatar: user.avatar,
         text,
         imageBase64,
         gifUrl,
@@ -285,6 +374,29 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
   const reactMessage = useCallback(
     (messageId: string, emoji: string) => {
+      // Optimistic reaction toggle (Item 16)
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m;
+          const currentReactions = { ...(m.reactions || {}) };
+          const userList = [...(currentReactions[emoji] || [])];
+          const myId = currentUserRef.current.id;
+          const idx = userList.indexOf(myId);
+          if (idx >= 0) {
+            userList.splice(idx, 1);
+            if (userList.length === 0) {
+              delete currentReactions[emoji];
+            } else {
+              currentReactions[emoji] = userList;
+            }
+          } else {
+            userList.push(myId);
+            currentReactions[emoji] = userList;
+          }
+          return { ...m, reactions: currentReactions };
+        })
+      );
+
       sendPacket({
         type: "react_message",
         messageId,
@@ -305,7 +417,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
   );
 
   const updateProfile = useCallback(
-    (profile: Partial<Pick<User, "name" | "color" | "avatar">>) => {
+    (profile: Partial<Pick<User, "name" | "color">>) => {
       sendPacket({
         type: "update_profile",
         ...profile,

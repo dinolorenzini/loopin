@@ -14,9 +14,95 @@ export class RoomDurableObject extends DurableObject {
   private userSockets: Map<string, Set<WebSocket>> = new Map();
   private typingUsers: Map<string, number> = new Map();
   private userLimiters: Map<string, TokenBucketRateLimiter> = new Map();
+  private dbInitialized: boolean = false;
 
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
+    this.initDb();
+  }
+
+  private initDb(): void {
+    if (this.dbInitialized) return;
+    try {
+      this.ctx.storage.sql.exec(`
+        CREATE TABLE IF NOT EXISTS messages (
+          id TEXT PRIMARY KEY,
+          roomId TEXT,
+          userId TEXT,
+          userName TEXT,
+          userColor TEXT,
+          text TEXT,
+          imageBase64 TEXT,
+          gifUrl TEXT,
+          timestamp INTEGER,
+          editedAt INTEGER,
+          reactionsJson TEXT,
+          readByJson TEXT,
+          isSystem INTEGER
+        );
+      `);
+
+      this.ctx.storage.sql.exec(`
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          color TEXT,
+          joinedAt INTEGER,
+          isFocused INTEGER,
+          lastActiveAt INTEGER
+        );
+      `);
+
+      // Restore messages from SQLite if available
+      const msgRows = this.ctx.storage.sql.exec<any>("SELECT * FROM messages ORDER BY timestamp ASC").toArray();
+      this.messages = msgRows.map((r) => this.rowToMessage(r));
+
+      // Restore users from SQLite if available
+      const userRows = this.ctx.storage.sql.exec<any>("SELECT * FROM users").toArray();
+      for (const u of userRows) {
+        this.users.set(u.id as string, {
+          id: u.id as string,
+          name: u.name as string,
+          color: (u.color as string) || "#facc15",
+          joinedAt: Number(u.joinedAt),
+          isFocused: Boolean(u.isFocused),
+          lastActiveAt: Number(u.lastActiveAt) || Date.now(),
+        });
+      }
+
+      this.dbInitialized = true;
+    } catch {
+      // Fallback if SQL is not supported in current environment
+      this.dbInitialized = true;
+    }
+  }
+
+  private rowToMessage(row: any): Message {
+    let reactions: MessageReaction | undefined;
+    let readBy: string[] | undefined;
+    try {
+      if (row.reactionsJson) reactions = JSON.parse(row.reactionsJson as string);
+    } catch {}
+    try {
+      if (row.readByJson) readBy = JSON.parse(row.readByJson as string);
+    } catch {}
+
+    return {
+      id: row.id as string,
+      roomId: row.roomId as string,
+      userId: row.userId as string,
+      userName: row.userName as string,
+      userColor: (row.userColor as string) || "#facc15",
+      text: (row.text as string) || undefined,
+      imageBase64: (row.imageBase64 as string) || undefined,
+      gifUrl: (row.gifUrl as string) || undefined,
+      timestamp: Number(row.timestamp),
+      editedAt: row.editedAt ? Number(row.editedAt) : undefined,
+      reactions,
+      readBy,
+      status: "delivered",
+      isSystem: Boolean(row.isSystem),
+    };
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -41,7 +127,6 @@ export class RoomDurableObject extends DurableObject {
     }
 
     if (url.pathname.endsWith("/stats")) {
-      // Ephemeral room stats without disclosing message contents or user info
       return Response.json({
         room: this.roomId,
         onlineCount: this.ctx.getWebSockets().length,
@@ -58,6 +143,11 @@ export class RoomDurableObject extends DurableObject {
       const data = JSON.parse(rawMessage) as ClientMessage;
 
       switch (data.type) {
+        case "ping": {
+          this.sendTo(ws, { type: "pong" });
+          break;
+        }
+
         case "join": {
           const user = data.user;
           if (!user?.id || !user?.name) return;
@@ -66,13 +156,8 @@ export class RoomDurableObject extends DurableObject {
           const cleanName = user.name.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 32);
           if (!cleanName) return;
           user.name = cleanName;
-
-          // If room has 0 active users, guarantee fresh ephemeral room
-          if (this.users.size === 0) {
-            this.messages = [];
-            this.typingUsers.clear();
-            this.userLimiters.clear();
-          }
+          user.isFocused = true;
+          user.lastActiveAt = Date.now();
 
           const attachment: SocketAttachment = {
             userId: user.id,
@@ -89,6 +174,53 @@ export class RoomDurableObject extends DurableObject {
           }
           sockets.add(ws);
 
+          // Save user to SQLite
+          try {
+            this.ctx.storage.sql.exec(
+              `INSERT INTO users (id, name, color, joinedAt, isFocused, lastActiveAt) 
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id) DO UPDATE SET 
+                 name=excluded.name, 
+                 color=excluded.color, 
+                 isFocused=excluded.isFocused, 
+                 lastActiveAt=excluded.lastActiveAt`,
+              user.id,
+              user.name,
+              user.color || "#facc15",
+              user.joinedAt || Date.now(),
+              1,
+              user.lastActiveAt
+            );
+          } catch {}
+
+          // Generate System Announcement for user joining the room (Item 7)
+          const joinMsg: Message = {
+            id: crypto.randomUUID(),
+            roomId: this.roomId,
+            userId: "system",
+            userName: "System",
+            userColor: "#facc15",
+            text: `${user.name} joined the room`,
+            timestamp: Date.now(),
+            isSystem: true,
+            status: "delivered",
+          };
+          this.messages.push(joinMsg);
+
+          try {
+            this.ctx.storage.sql.exec(
+              `INSERT INTO messages (id, roomId, userId, userName, userColor, text, timestamp, isSystem) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+              joinMsg.id,
+              joinMsg.roomId,
+              joinMsg.userId,
+              joinMsg.userName,
+              joinMsg.userColor,
+              joinMsg.text || "",
+              joinMsg.timestamp
+            );
+          } catch {}
+
           // Send initialization data to the newly joined client
           this.sendTo(ws, {
             type: "init",
@@ -98,7 +230,7 @@ export class RoomDurableObject extends DurableObject {
             selfId: user.id,
           });
 
-          // Broadcast user_joined to all other clients
+          // Broadcast user_joined and the system message to all other clients
           this.broadcast(
             {
               type: "user_joined",
@@ -106,6 +238,46 @@ export class RoomDurableObject extends DurableObject {
             },
             ws
           );
+
+          this.broadcast(
+            {
+              type: "new_message",
+              message: joinMsg,
+            },
+            ws
+          );
+          break;
+        }
+
+        case "focus_change": {
+          const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+          if (!attachment?.userId) return;
+
+          const user = this.users.get(attachment.userId);
+          if (!user) return;
+
+          const isFocused = Boolean(data.isFocused);
+          const lastActiveAt = data.lastActiveAt || Date.now();
+
+          user.isFocused = isFocused;
+          user.lastActiveAt = lastActiveAt;
+          this.users.set(user.id, user);
+
+          try {
+            this.ctx.storage.sql.exec(
+              "UPDATE users SET isFocused = ?, lastActiveAt = ? WHERE id = ?",
+              isFocused ? 1 : 0,
+              lastActiveAt,
+              user.id
+            );
+          } catch {}
+
+          this.broadcast({
+            type: "user_focus_changed",
+            userId: user.id,
+            isFocused,
+            lastActiveAt,
+          });
           break;
         }
 
@@ -134,16 +306,13 @@ export class RoomDurableObject extends DurableObject {
           const imageBase64 = data.imageBase64;
           let gifUrl = data.gifUrl;
 
-          // Message must contain at least text, image, or gif
           if (!text && !imageBase64 && !gifUrl) return;
 
-          // Strict text sanitization: strip control characters, limit to 4000 chars
           if (text) {
             text = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").trim();
             if (!text || text.length > 4000) return;
           }
 
-          // Strict image validation: prevent SVG XSS payloads and ensure valid Base64
           if (imageBase64) {
             const isSafeImage = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(imageBase64);
             if (!isSafeImage || imageBase64.length > 5000000) {
@@ -155,13 +324,10 @@ export class RoomDurableObject extends DurableObject {
             }
           }
 
-          // Strict GIF URL validation: require https protocol and prevent javascript: injection
           if (gifUrl) {
             try {
               const parsed = new URL(gifUrl);
-              if (parsed.protocol !== "https:") {
-                return;
-              }
+              if (parsed.protocol !== "https:") return;
             } catch {
               return;
             }
@@ -174,7 +340,6 @@ export class RoomDurableObject extends DurableObject {
             userId: user.id,
             userName: user.name,
             userColor: user.color,
-            userAvatar: user.avatar,
             text: text || undefined,
             imageBase64: imageBase64 || undefined,
             gifUrl: gifUrl || undefined,
@@ -185,6 +350,25 @@ export class RoomDurableObject extends DurableObject {
           };
 
           this.messages.push(message);
+
+          // Save message to SQLite
+          try {
+            this.ctx.storage.sql.exec(
+              `INSERT INTO messages (id, roomId, userId, userName, userColor, text, imageBase64, gifUrl, timestamp, reactionsJson, readByJson, isSystem) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+              message.id,
+              message.roomId,
+              message.userId,
+              message.userName,
+              message.userColor,
+              message.text || null,
+              message.imageBase64 || null,
+              message.gifUrl || null,
+              message.timestamp,
+              JSON.stringify(message.reactions || {}),
+              JSON.stringify(message.readBy || [])
+            );
+          } catch {}
 
           // Clear user's typing status when sending
           this.typingUsers.delete(user.id);
@@ -206,7 +390,6 @@ export class RoomDurableObject extends DurableObject {
           if (messageIndex === -1) return;
 
           const msg = this.messages[messageIndex];
-          // Only message author can edit
           if (msg.userId !== attachment.userId) return;
 
           const newText = data.text?.trim();
@@ -214,6 +397,15 @@ export class RoomDurableObject extends DurableObject {
 
           msg.text = newText;
           msg.editedAt = Date.now();
+
+          try {
+            this.ctx.storage.sql.exec(
+              "UPDATE messages SET text = ?, editedAt = ? WHERE id = ?",
+              msg.text,
+              msg.editedAt,
+              msg.id
+            );
+          } catch {}
 
           this.broadcast({
             type: "message_edited",
@@ -230,10 +422,13 @@ export class RoomDurableObject extends DurableObject {
           if (messageIndex === -1) return;
 
           const msg = this.messages[messageIndex];
-          // Author or anyone in the ephemeral room can delete if allowed, but author is strictly verified
           if (msg.userId !== attachment.userId) return;
 
           this.messages.splice(messageIndex, 1);
+
+          try {
+            this.ctx.storage.sql.exec("DELETE FROM messages WHERE id = ?", data.id);
+          } catch {}
 
           this.broadcast({
             type: "message_deleted",
@@ -246,7 +441,16 @@ export class RoomDurableObject extends DurableObject {
           const attachment = ws.deserializeAttachment() as SocketAttachment | null;
           if (!attachment?.userId) return;
 
-          const message = this.messages.find((m) => m.id === data.messageId);
+          let message = this.messages.find((m) => m.id === data.messageId);
+          if (!message) {
+            try {
+              const rows = this.ctx.storage.sql.exec<any>("SELECT * FROM messages WHERE id = ?", data.messageId).toArray();
+              if (rows.length > 0) {
+                message = this.rowToMessage(rows[0]);
+                this.messages.push(message);
+              }
+            } catch {}
+          }
           if (!message) return;
 
           const emoji = data.emoji;
@@ -260,7 +464,6 @@ export class RoomDurableObject extends DurableObject {
           const existingIndex = userList.indexOf(attachment.userId);
 
           if (existingIndex >= 0) {
-            // Toggle off
             userList.splice(existingIndex, 1);
             if (userList.length === 0) {
               delete message.reactions[emoji];
@@ -268,10 +471,17 @@ export class RoomDurableObject extends DurableObject {
               message.reactions[emoji] = userList;
             }
           } else {
-            // Toggle on
             userList.push(attachment.userId);
             message.reactions[emoji] = userList;
           }
+
+          try {
+            this.ctx.storage.sql.exec(
+              "UPDATE messages SET reactionsJson = ? WHERE id = ?",
+              JSON.stringify(message.reactions),
+              message.id
+            );
+          } catch {}
 
           this.broadcast({
             type: "message_reacted",
@@ -294,6 +504,13 @@ export class RoomDurableObject extends DurableObject {
                 msg.readBy.push(attachment.userId);
                 msg.status = "read";
                 updatedIds.push(mid);
+                try {
+                  this.ctx.storage.sql.exec(
+                    "UPDATE messages SET readByJson = ? WHERE id = ?",
+                    JSON.stringify(msg.readBy),
+                    msg.id
+                  );
+                } catch {}
               }
             }
           }
@@ -330,9 +547,17 @@ export class RoomDurableObject extends DurableObject {
 
           if (data.name && data.name.trim()) user.name = data.name.trim().slice(0, 32);
           if (data.color) user.color = data.color;
-          if (data.avatar) user.avatar = data.avatar;
 
           this.users.set(user.id, user);
+
+          try {
+            this.ctx.storage.sql.exec(
+              "UPDATE users SET name = ?, color = ? WHERE id = ?",
+              user.name,
+              user.color,
+              user.id
+            );
+          } catch {}
 
           this.broadcast({
             type: "user_updated",
@@ -367,30 +592,55 @@ export class RoomDurableObject extends DurableObject {
           this.users.delete(userId);
           this.typingUsers.delete(userId);
 
+          try {
+            this.ctx.storage.sql.exec("DELETE FROM users WHERE id = ?", userId);
+          } catch {}
+
           if (user) {
             this.broadcast({
               type: "user_left",
               userId: user.id,
               userName: user.name,
             });
+
+            // System Announcement for user leaving
+            const leaveMsg: Message = {
+              id: crypto.randomUUID(),
+              roomId: this.roomId,
+              userId: "system",
+              userName: "System",
+              userColor: "#facc15",
+              text: `${user.name} left the room`,
+              timestamp: Date.now(),
+              isSystem: true,
+              status: "delivered",
+            };
+            this.messages.push(leaveMsg);
+            this.broadcast({
+              type: "new_message",
+              message: leaveMsg,
+            });
           }
         }
       }
     }
 
-    // Check remaining connected open sockets in this room (excluding the closing socket)
+    // Check remaining connected open sockets in this room
     const activeSockets = this.ctx
       .getWebSockets()
       .filter((s) => s !== ws && s.readyState === WebSocket.OPEN);
 
-    // CRITICAL REQUIREMENT:
-    // "when all users leave a room/disconnect, it deletes all messages"
+    // CRITICAL: When all users leave a room/disconnect, wipe all messages and state
     if (activeSockets.length === 0 || this.users.size === 0) {
       this.messages = [];
       this.users.clear();
       this.userSockets.clear();
       this.typingUsers.clear();
       this.userLimiters.clear();
+      try {
+        this.ctx.storage.sql.exec("DELETE FROM messages;");
+        this.ctx.storage.sql.exec("DELETE FROM users;");
+      } catch {}
       await this.ctx.storage.deleteAll();
     }
   }

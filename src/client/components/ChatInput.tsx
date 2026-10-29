@@ -4,7 +4,6 @@ import {
   Image as ImageIcon,
   Smile,
   Film,
-  Paperclip,
   Loader2,
   X,
 } from "lucide-react";
@@ -16,12 +15,14 @@ interface ChatInputProps {
   onSendMessage: (payload: { text?: string; imageBase64?: string; gifUrl?: string }) => void;
   onTyping: (isTyping: boolean) => void;
   disabled?: boolean;
+  typingUsers?: { id: string; name: string }[];
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
   onSendMessage,
   onTyping,
   disabled = false,
+  typingUsers = [],
 }) => {
   const [text, setText] = useState("");
   const [pendingImage, setPendingImage] = useState<string | null>(null);
@@ -33,14 +34,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
 
-  // Auto-focus input
   useEffect(() => {
     if (!disabled && textareaRef.current) {
       textareaRef.current.focus();
     }
   }, [disabled]);
 
-  // Handle typing debounce
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setText(val);
@@ -56,7 +55,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  // Submit message
   const handleSend = () => {
     const cleanText = text.trim();
     if (!cleanText && !pendingImage) return;
@@ -71,7 +69,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     onTyping(false);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -84,7 +81,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  // File selection
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -101,7 +97,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  // Global paste handler for clipboard images
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
@@ -117,7 +112,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               const base64 = await processImageToBase64(file);
               setPendingImage(base64);
             } catch {
-              // Ignore paste failure
             } finally {
               setIsProcessingImage(false);
             }
@@ -133,12 +127,39 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className="chat-input-wrapper">
+      {/* Discord-style typing indicator directly above input bar (Item 1) */}
+      <div className={`discord-typing-bar ${typingUsers.length > 0 ? "visible" : ""}`}>
+        {typingUsers.length > 0 && (
+          <>
+            <div className="typing-dots">
+              <span />
+              <span />
+              <span />
+            </div>
+            <span className="typing-label">
+              {typingUsers.length === 1 ? (
+                <strong>{typingUsers[0].name}</strong>
+              ) : typingUsers.length === 2 ? (
+                <>
+                  <strong>{typingUsers[0].name}</strong> and <strong>{typingUsers[1].name}</strong>
+                </>
+              ) : (
+                <>
+                  <strong>{typingUsers[0].name}</strong> and {typingUsers.length - 1} others
+                </>
+              )}{" "}
+              {typingUsers.length === 1 ? "is" : "are"} typing...
+            </span>
+          </>
+        )}
+      </div>
+
       {/* Pending image preview */}
       {pendingImage && (
         <div className="pending-image-preview">
           <div className="pending-image-card">
             <img src={pendingImage} alt="Attachment preview" className="pending-image-thumb" />
-            <span className="pending-image-label">Image attached (Base64)</span>
+            <span className="pending-image-label">Image attached</span>
             <button
               type="button"
               className="remove-image-btn"
@@ -181,7 +202,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       )}
 
       <div className="chat-input-bar">
-        {/* Hidden file input */}
         <input
           ref={fileInputRef}
           type="file"
@@ -190,13 +210,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           onChange={handleFileChange}
         />
 
-        {/* Action icons left */}
         <div className="input-actions-left">
           <button
             type="button"
             className="input-tool-btn"
             onClick={() => fileInputRef.current?.click()}
-            title="Upload Image (stored as Base64)"
+            title="Upload Image"
             disabled={disabled || isProcessingImage}
           >
             {isProcessingImage ? (
@@ -233,7 +252,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </button>
         </div>
 
-        {/* Text input textarea */}
         <textarea
           ref={textareaRef}
           value={text}
@@ -245,7 +263,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           disabled={disabled}
         />
 
-        {/* Send button right */}
         <button
           type="button"
           className={`input-send-btn ${text.trim() || pendingImage ? "ready" : ""}`}

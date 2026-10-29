@@ -35,7 +35,7 @@ export const App: React.FC = () => {
   const navigateToHome = useCallback(() => {
     window.history.pushState({}, "", "/");
     setCurrentRoom(null);
-    document.title = "Loopin - Ephemeral Real-Time Chat";
+    document.title = "Loopin";
   }, []);
 
   return (
