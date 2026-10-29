@@ -1,21 +1,40 @@
 import React, { useRef, useEffect } from "react";
-import type { BackgroundType } from "../hooks/useSettings";
+import { useSettings } from "../hooks/useSettings";
 
 interface ChatBackgroundProps {
-  type: BackgroundType;
-  accentColor?: string;
-  noAnimations?: boolean;
+  className?: string;
 }
 
-export const ChatBackground: React.FC<ChatBackgroundProps> = ({
-  type,
-  accentColor = "#facc15",
-  noAnimations = false,
-}) => {
+export const ChatBackground: React.FC<ChatBackgroundProps> = ({ className = "" }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const mouseRef = useRef<{ x: number; y: number; active: boolean }>({ x: 0, y: 0, active: false });
+  const { settings } = useSettings();
+
+  const {
+    background: type,
+    themeColor: accentColor = "#facc15",
+    noAnimations = false,
+    bgDim = 0.45,
+    bgBlur = 0,
+    shaderSpeed = 1.0,
+  } = settings;
 
   useEffect(() => {
-    // If animations are disabled or type is a static background, do not run canvas animation
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseRef.current = { x: e.clientX, y: e.clientY, active: true };
+    };
+    const handleMouseLeave = () => {
+      mouseRef.current.active = false;
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseleave", handleMouseLeave);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, []);
+
+  useEffect(() => {
     if (noAnimations || type === "minimal-dark" || type === "telegram-doodle" || type === "geometric-grid") {
       return;
     }
@@ -29,9 +48,9 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
     let width = (canvas.width = window.innerWidth);
     let height = (canvas.height = window.innerHeight);
 
-    // Performance adaptation for lower-end devices like Chromebooks (Item 21)
     const isLowEnd = typeof navigator !== "undefined" && (navigator.hardwareConcurrency || 4) <= 4;
-    const particleMultiplier = isLowEnd ? 0.35 : 1.0;
+    const particleMultiplier = isLowEnd ? 0.45 : 1.0;
+    const speed = Math.max(0.1, shaderSpeed);
 
     let isPaused = false;
     const handleVisibilityChange = () => {
@@ -46,61 +65,59 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
     };
     window.addEventListener("resize", handleResize);
 
-    // ── 1. Starfield Engine (yukiloz7 inspired) ──
+    // ── 1. Warp Starfield (Hyperspace streaks) ──
     if (type === "starfield") {
-      const numStars = Math.floor(180 * particleMultiplier);
-      const stars: { x: number; y: number; z: number; pz: number }[] = [];
-      const speed = 2.2;
-
-      for (let i = 0; i < numStars; i++) {
-        stars.push({
-          x: (Math.random() - 0.5) * width * 2,
-          y: (Math.random() - 0.5) * height * 2,
-          z: Math.random() * width,
-          pz: width,
-        });
-      }
+      const numStars = Math.floor(220 * particleMultiplier);
+      const stars = Array.from({ length: numStars }, () => ({
+        x: (Math.random() - 0.5) * width * 2,
+        y: (Math.random() - 0.5) * height * 2,
+        z: Math.random() * width,
+        pz: width,
+      }));
 
       const render = () => {
         if (!isPaused) {
-          ctx.fillStyle = "rgba(9, 9, 11, 0.4)";
+          ctx.fillStyle = "rgba(9, 9, 11, 0.35)";
           ctx.fillRect(0, 0, width, height);
 
           const cx = width / 2;
           const cy = height / 2;
-
-          ctx.strokeStyle = accentColor;
-          ctx.fillStyle = "#ffffff";
+          const starSpeed = 3.5 * speed;
 
           for (const s of stars) {
-            s.z -= speed;
-            if (s.z <= 0) {
+            s.pz = s.z;
+            s.z -= starSpeed;
+            if (s.z <= 10) {
               s.z = width;
               s.pz = width;
               s.x = (Math.random() - 0.5) * width * 2;
               s.y = (Math.random() - 0.5) * height * 2;
             }
 
-            const k = 180 / s.z;
+            const k = 220 / s.z;
             const px = s.x * k + cx;
             const py = s.y * k + cy;
 
+            const prevK = 220 / s.pz;
+            const prevPx = s.x * prevK + cx;
+            const prevPy = s.y * prevK + cy;
+
             if (px >= 0 && px < width && py >= 0 && py < height) {
-              const size = Math.max(0.6, (1 - s.z / width) * 2.5);
-              const prevK = 180 / s.pz;
-              const prevPx = s.x * prevK + cx;
-              const prevPy = s.y * prevK + cy;
+              const depth = 1 - s.z / width;
+              ctx.lineWidth = Math.max(0.8, depth * 2.5);
+              ctx.strokeStyle = depth > 0.7 ? accentColor : `rgba(255, 255, 255, ${depth * 0.8})`;
 
               ctx.beginPath();
               ctx.moveTo(prevPx, prevPy);
               ctx.lineTo(px, py);
               ctx.stroke();
 
+              // Star head
               ctx.beginPath();
-              ctx.arc(px, py, size, 0, Math.PI * 2);
+              ctx.arc(px, py, Math.max(0.8, depth * 2), 0, Math.PI * 2);
+              ctx.fillStyle = "#ffffff";
               ctx.fill();
             }
-            s.pz = s.z;
           }
         }
         animationFrameId = requestAnimationFrame(render);
@@ -108,25 +125,23 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       render();
     }
 
-    // ── 2. Constellation Network Engine (adrian-ortega inspired) ──
+    // ── 2. Interactive Neural Constellation ──
     else if (type === "constellation") {
-      const nodeCount = Math.floor(70 * particleMultiplier);
-      const maxDistance = 110;
-      const nodes: { x: number; y: number; vx: number; vy: number; radius: number }[] = [];
-
-      for (let i = 0; i < nodeCount; i++) {
-        nodes.push({
-          x: Math.random() * width,
-          y: Math.random() * height,
-          vx: (Math.random() - 0.5) * 0.7,
-          vy: (Math.random() - 0.5) * 0.7,
-          radius: Math.random() * 2 + 1,
-        });
-      }
+      const nodeCount = Math.floor(75 * particleMultiplier);
+      const maxDist = 130;
+      const nodes = Array.from({ length: nodeCount }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.8 * speed,
+        vy: (Math.random() - 0.5) * 0.8 * speed,
+        r: Math.random() * 2.2 + 1.2,
+      }));
 
       const render = () => {
         if (!isPaused) {
           ctx.clearRect(0, 0, width, height);
+
+          const mouse = mouseRef.current;
 
           for (let i = 0; i < nodes.length; i++) {
             const p = nodes[i];
@@ -136,10 +151,25 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
             if (p.x < 0 || p.x > width) p.vx *= -1;
             if (p.y < 0 || p.y > height) p.vy *= -1;
 
+            // Mouse repulsion / attraction
+            if (mouse.active) {
+              const mdx = mouse.x - p.x;
+              const mdy = mouse.y - p.y;
+              const mDist = Math.hypot(mdx, mdy);
+              if (mDist < 140 && mDist > 0) {
+                p.x -= (mdx / mDist) * 1.5;
+                p.y -= (mdy / mDist) * 1.5;
+              }
+            }
+
+            // Node core with glow
             ctx.beginPath();
-            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = accentColor;
+            ctx.shadowBlur = 6;
+            ctx.shadowColor = accentColor;
             ctx.fill();
+            ctx.shadowBlur = 0;
 
             for (let j = i + 1; j < nodes.length; j++) {
               const p2 = nodes[j];
@@ -147,9 +177,9 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
               const dy = p.y - p2.y;
               const dist = Math.hypot(dx, dy);
 
-              if (dist < maxDistance) {
-                const alpha = (1 - dist / maxDistance) * 0.25;
-                ctx.strokeStyle = `rgba(250, 204, 21, ${alpha})`;
+              if (dist < maxDist) {
+                const alpha = (1 - dist / maxDist) * 0.35;
+                ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(p.x, p.y);
@@ -164,33 +194,37 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       render();
     }
 
-    // ── 3. Aurora Liquid Waves Engine (soju22 inspired) ──
+    // ── 3. Aurora Silk Waves ──
     else if (type === "aurora") {
-      let step = 0;
-      const waveCount = 3;
+      let t = 0;
+      const ribbons = [
+        { color: "rgba(250, 204, 21, 0.12)", yBase: 0.65, amp: 45, freq: 0.0025 },
+        { color: "rgba(56, 189, 248, 0.10)", yBase: 0.72, amp: 60, freq: 0.0020 },
+        { color: "rgba(192, 132, 252, 0.09)", yBase: 0.78, amp: 50, freq: 0.0030 },
+      ];
 
       const render = () => {
         if (!isPaused) {
           ctx.clearRect(0, 0, width, height);
-          step += 0.015;
+          t += 0.015 * speed;
 
-          for (let i = 0; i < waveCount; i++) {
+          for (const rib of ribbons) {
             ctx.beginPath();
-            const yOffset = height * (0.6 + i * 0.12);
+            const y0 = height * rib.yBase;
             ctx.moveTo(0, height);
 
-            for (let x = 0; x <= width; x += 15) {
-              const y = yOffset + Math.sin(x * 0.003 + step + i * 1.5) * 45 + Math.cos(x * 0.002 - step) * 25;
+            for (let x = 0; x <= width; x += 12) {
+              const y = y0 + Math.sin(x * rib.freq + t) * rib.amp + Math.cos(x * 0.001 - t * 0.8) * 30;
               ctx.lineTo(x, y);
             }
 
             ctx.lineTo(width, height);
             ctx.closePath();
 
-            const gradient = ctx.createLinearGradient(0, yOffset - 50, 0, height);
-            gradient.addColorStop(0, i === 0 ? "rgba(250, 204, 21, 0.08)" : "rgba(245, 158, 11, 0.05)");
-            gradient.addColorStop(1, "rgba(9, 9, 11, 0)");
-            ctx.fillStyle = gradient;
+            const grad = ctx.createLinearGradient(0, y0 - 80, 0, height);
+            grad.addColorStop(0, rib.color);
+            grad.addColorStop(1, "rgba(9, 9, 11, 0)");
+            ctx.fillStyle = grad;
             ctx.fill();
           }
         }
@@ -199,34 +233,43 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       render();
     }
 
-    // ── 4. Cyber Rain / Matrix Engine ──
+    // ── 4. Cyber Rain (Authentic Matrix Stream) ──
     else if (type === "matrix") {
       const fontSize = 14;
-      const columns = Math.floor(width / fontSize);
-      const drops: number[] = Array.from({ length: columns }, () => Math.floor(Math.random() * -50));
-      const chars = "01LOOPIN23456789";
+      const cols = Math.floor(width / fontSize);
+      const drops: number[] = Array.from({ length: cols }, () => Math.floor(Math.random() * -60));
+      const chars = "01LOOPIN23456789ｱｳｴｵｶｷｹｺｻｼｽｾｿﾀﾂﾃﾅﾆﾇﾈﾊﾋﾎﾏﾐﾑﾒﾓﾔﾕﾗﾘﾜ";
 
       const render = () => {
         if (!isPaused) {
-          ctx.fillStyle = "rgba(9, 9, 11, 0.15)";
+          ctx.fillStyle = "rgba(9, 9, 11, 0.18)";
           ctx.fillRect(0, 0, width, height);
 
-          ctx.fillStyle = "rgba(250, 204, 21, 0.65)";
-          ctx.font = `${fontSize}px monospace`;
+          ctx.font = `600 ${fontSize}px monospace`;
 
           for (let i = 0; i < drops.length; i++) {
             const char = chars[Math.floor(Math.random() * chars.length)];
             const x = i * fontSize;
             const y = drops[i] * fontSize;
 
-            if (y > 0 && y < height) {
+            if (y > 0 && y < height + 30) {
+              // Glowing leading head
+              ctx.fillStyle = "#ffffff";
+              ctx.shadowBlur = 8;
+              ctx.shadowColor = accentColor;
               ctx.fillText(char, x, y);
+              ctx.shadowBlur = 0;
+
+              // Tail character
+              ctx.fillStyle = accentColor;
+              const prevChar = chars[Math.floor(Math.random() * chars.length)];
+              ctx.fillText(prevChar, x, y - fontSize);
             }
 
-            if (y > height && Math.random() > 0.975) {
+            if (y > height && Math.random() > 0.98) {
               drops[i] = 0;
             }
-            drops[i]++;
+            drops[i] += 1 * speed;
           }
         }
         animationFrameId = requestAnimationFrame(render);
@@ -234,17 +277,17 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       render();
     }
 
-    // ── 5. Floating Fireflies / Embers Engine ──
+    // ── 5. Bioluminescent Fireflies ──
     else if (type === "fireflies") {
-      const emberCount = Math.floor(45 * particleMultiplier);
+      const emberCount = Math.floor(55 * particleMultiplier);
       const embers = Array.from({ length: emberCount }, () => ({
         x: Math.random() * width,
         y: Math.random() * height,
-        r: Math.random() * 2 + 1,
-        vy: -(Math.random() * 0.6 + 0.2),
-        vx: (Math.random() - 0.5) * 0.3,
-        alpha: Math.random(),
-        pulseSpeed: Math.random() * 0.03 + 0.01,
+        r: Math.random() * 2.5 + 1.2,
+        vy: -(Math.random() * 0.5 + 0.2) * speed,
+        vx: (Math.random() - 0.5) * 0.4 * speed,
+        phase: Math.random() * Math.PI * 2,
+        pulseSpeed: (Math.random() * 0.03 + 0.015) * speed,
       }));
 
       const render = () => {
@@ -253,22 +296,31 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
           for (const e of embers) {
             e.y += e.vy;
-            e.x += e.vx;
-            e.alpha += e.pulseSpeed;
+            e.x += e.vx + Math.sin(e.phase) * 0.3;
+            e.phase += e.pulseSpeed;
 
-            if (e.y < -10) e.y = height + 10;
-            if (e.x < -10) e.x = width + 10;
-            if (e.x > width + 10) e.x = -10;
+            if (e.y < -20) e.y = height + 20;
+            if (e.x < -20) e.x = width + 20;
+            if (e.x > width + 20) e.x = -20;
 
-            const opacity = (Math.sin(e.alpha) + 1) * 0.5 * 0.7;
+            const alpha = (Math.sin(e.phase) + 1) * 0.5 * 0.85;
+
+            // Soft radiant glow halo
+            const grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * 5);
+            grad.addColorStop(0, accentColor);
+            grad.addColorStop(0.3, `rgba(250, 204, 21, ${alpha * 0.8})`);
+            grad.addColorStop(1, "rgba(250, 204, 21, 0)");
 
             ctx.beginPath();
-            ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(250, 204, 21, ${opacity})`;
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = "#facc15";
+            ctx.arc(e.x, e.y, e.r * 5, 0, Math.PI * 2);
+            ctx.fillStyle = grad;
             ctx.fill();
-            ctx.shadowBlur = 0;
+
+            // Core
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+            ctx.fillStyle = "#ffffff";
+            ctx.fill();
           }
         }
         animationFrameId = requestAnimationFrame(render);
@@ -276,38 +328,93 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       render();
     }
 
-    // ── 6. Retro Synth Grid Engine ──
+    // ── 6. Synthwave 80s Cyber Horizon (FIXED & FULLY FUNCTIONAL) ──
     else if (type === "retro-grid") {
-      let offset = 0;
+      let gridOffset = 0;
+      const horizonY = height * 0.55;
 
       const render = () => {
         if (!isPaused) {
           ctx.clearRect(0, 0, width, height);
-          offset = (offset + 0.6) % 30;
+          gridOffset = (gridOffset + 0.012 * speed) % 1;
 
-          const horizon = height * 0.55;
-          ctx.strokeStyle = "rgba(250, 204, 21, 0.12)";
+          // Horizon Sun with segment stripes
+          const sunRadius = Math.min(width * 0.18, 110);
+          const sunX = width / 2;
+          const sunY = horizonY;
+
+          // Glowing sun
+          const sunGrad = ctx.createLinearGradient(sunX, sunY - sunRadius, sunX, sunY + sunRadius);
+          sunGrad.addColorStop(0, "#fde047");
+          sunGrad.addColorStop(0.5, accentColor);
+          sunGrad.addColorStop(1, "#f43f5e");
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(sunX, sunY, sunRadius, Math.PI, 0, false);
+          ctx.fillStyle = sunGrad;
+          ctx.shadowBlur = 30;
+          ctx.shadowColor = accentColor;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          // Sun horizontal blind slices
+          ctx.fillStyle = "#09090b";
+          for (let slice = 0; slice < 6; slice++) {
+            const sliceY = sunY - sunRadius * 0.5 + slice * (sunRadius * 0.11);
+            const sliceH = 2 + slice * 1.5;
+            ctx.fillRect(sunX - sunRadius - 10, sliceY, (sunRadius + 10) * 2, sliceH);
+          }
+          ctx.restore();
+
+          // Stars in the upper sky
+          ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+          for (let s = 0; s < 40; s++) {
+            const sx = (Math.sin(s * 99) * 0.5 + 0.5) * width;
+            const sy = (Math.cos(s * 33) * 0.5 + 0.5) * horizonY;
+            ctx.fillRect(sx, sy, 1.5, 1.5);
+          }
+
+          // Ground Horizon glow line
+          ctx.beginPath();
+          ctx.moveTo(0, horizonY);
+          ctx.lineTo(width, horizonY);
+          ctx.strokeStyle = accentColor;
+          ctx.lineWidth = 2;
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = accentColor;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+
+          // Ground 3D Perspective Grid
+          const groundHeight = height - horizonY;
+          ctx.strokeStyle = accentColor;
           ctx.lineWidth = 1;
 
-          // Vertical perspective lines
-          const fovLines = 24;
-          for (let i = -fovLines; i <= fovLines; i++) {
-            const xBottom = width / 2 + i * 40;
+          // Horizontal grid lines with perspective compression
+          const numHorizLines = 16;
+          for (let i = 0; i < numHorizLines; i++) {
+            const p = (i + gridOffset) / numHorizLines;
+            // Quadratic perspective curve
+            const y = horizonY + Math.pow(p, 2.5) * groundHeight;
+            const alpha = Math.min(1, Math.pow(p, 1.2) * 0.65);
+            ctx.strokeStyle = `rgba(250, 204, 21, ${alpha})`;
+
             ctx.beginPath();
-            ctx.moveTo(width / 2, horizon);
-            ctx.lineTo(xBottom, height);
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
             ctx.stroke();
           }
 
-          // Horizontal moving lines
-          for (let y = horizon; y < height; y += (y - horizon) * 0.2 + 8) {
-            const yCurrent = y + offset * ((y - horizon) / height);
-            if (yCurrent < height) {
-              ctx.beginPath();
-              ctx.moveTo(0, yCurrent);
-              ctx.lineTo(width, yCurrent);
-              ctx.stroke();
-            }
+          // Radiating vertical perspective lines converging at (sunX, horizonY)
+          const numVertLines = 28;
+          for (let i = -numVertLines / 2; i <= numVertLines / 2; i++) {
+            const bottomX = sunX + i * (width / 14);
+            ctx.strokeStyle = "rgba(250, 204, 21, 0.25)";
+            ctx.beginPath();
+            ctx.moveTo(sunX, horizonY);
+            ctx.lineTo(bottomX, height);
+            ctx.stroke();
           }
         }
         animationFrameId = requestAnimationFrame(render);
@@ -320,15 +427,25 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("resize", handleResize);
     };
-  }, [type, accentColor, noAnimations]);
+  }, [type, accentColor, noAnimations, shaderSpeed]);
 
   return (
-    <div className={`chat-bg-layer chat-bg-${type}`} aria-hidden="true">
+    <div className={`chat-bg-layer chat-bg-${type} ${className}`} aria-hidden="true">
       {type !== "minimal-dark" && type !== "telegram-doodle" && type !== "geometric-grid" && !noAnimations && (
         <canvas ref={canvasRef} className="chat-bg-canvas" />
       )}
       {type === "telegram-doodle" && <div className="static-bg-doodle" />}
       {type === "geometric-grid" && <div className="static-bg-grid" />}
+
+      {/* Dim & Blur Overlay (Bug 2: Background darkness & blur slider) */}
+      <div
+        className="chat-bg-overlay"
+        style={{
+          backgroundColor: `rgba(9, 9, 11, ${bgDim})`,
+          backdropFilter: bgBlur > 0 ? `blur(${bgBlur}px)` : "none",
+          WebkitBackdropFilter: bgBlur > 0 ? `blur(${bgBlur}px)` : "none",
+        }}
+      />
     </div>
   );
 };

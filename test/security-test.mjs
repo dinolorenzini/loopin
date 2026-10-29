@@ -105,8 +105,42 @@ async function runSecurityTests() {
   );
   console.log("✓ Ephemeral zero-data wipe confirmed: 0 residual user messages found");
 
+  // 6. Test 16-character username limit & 2000-character message limit
+  console.log("\nStep 6: Testing 16-char Username & 2000-char Message Limits...");
+  const longName = "A".repeat(40);
+  const client3 = new WS(wsUrl);
+  const rec3 = [];
+  client3.onmessage = (e) => rec3.push(JSON.parse(e.data));
+  await new Promise((r) => (client3.onopen = r));
+  client3.send(
+    JSON.stringify({
+      type: "join",
+      user: { id: "sec-user-3", name: longName, color: "#eab308", joinedAt: Date.now() },
+    })
+  );
+  await sleep(200);
+  const joinMsg = rec2.find((m) => m.type === "user_joined" && m.user.id === "sec-user-3");
+  assert(joinMsg, "User join event received");
+  assert.strictEqual(joinMsg.user.name.length, 16, `Username must be trimmed to 16 chars, got ${joinMsg.user.name.length}`);
+  console.log("✓ Username strictly truncated to 16 chars:", joinMsg.user.name);
+
+  // Send message longer than 2000 chars
+  const longText = "X".repeat(2500);
+  client3.send(
+    JSON.stringify({
+      type: "send_message",
+      text: longText,
+    })
+  );
+  await sleep(200);
+  const msgOverLimit = rec3.find((m) => m.type === "new_message" && m.message.userId === "sec-user-3");
+  assert(msgOverLimit, "Message received");
+  assert.strictEqual(msgOverLimit.message.text.length, 2000, `Message must be trimmed to 2000 chars, got ${msgOverLimit.message.text.length}`);
+  console.log("✓ Message text strictly capped at 2000 chars");
+
   client2.close();
-  console.log("\n🎉 ALL SECURITY & RATE LIMITING AUDIT CHECKS PASSED!");
+  client3.close();
+  console.log("\n🎉 ALL SECURITY, RATE LIMITING & PAYLOAD AUDIT CHECKS PASSED!");
 }
 
 runSecurityTests().catch((err) => {

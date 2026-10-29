@@ -19,20 +19,26 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
   const reconnectTimeoutRef = useRef<number | null>(null);
   const pingIntervalRef = useRef<number | null>(null);
   const isMountedRef = useRef<boolean>(true);
+
   const currentUserRef = useRef<User>(currentUser);
   currentUserRef.current = currentUser;
-
-  // Offline outbox queue for messages sent while disconnected (Item 8)
-  const pendingOutboxRef = useRef<ClientMessage[]>([]);
 
   const onNewMessageRef = useRef(onNewMessage);
   onNewMessageRef.current = onNewMessage;
 
+  // Offline outbox queue for messages sent while disconnected (Item 8)
+  const pendingOutboxRef = useRef<ClientMessage[]>([]);
+
   const sendPacket = useCallback((packet: ClientMessage) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify(packet));
+      try {
+        socketRef.current.send(JSON.stringify(packet));
+      } catch {
+        if (packet.type === "send_message") {
+          pendingOutboxRef.current.push(packet);
+        }
+      }
     } else {
-      // If disconnected and sending a message, queue in outbox
       if (packet.type === "send_message") {
         pendingOutboxRef.current.push(packet);
       }
@@ -40,7 +46,16 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
   }, []);
 
   const connect = useCallback(() => {
-    if (!roomId) return;
+    if (!roomId || !isMountedRef.current) return;
+
+    // Do not reconnect if already open or connecting (Fixes Bug 4 infinite loop)
+    if (
+      socketRef.current &&
+      (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
+
     if (socketRef.current) {
       try {
         socketRef.current.close();
@@ -61,14 +76,18 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
       setStatus("connected");
 
       // Send join event with user profile
-      sendPacket({
-        type: "join",
-        user: {
-          ...currentUserRef.current,
-          isFocused: !document.hidden,
-          lastActiveAt: Date.now(),
-        },
-      });
+      try {
+        ws.send(
+          JSON.stringify({
+            type: "join",
+            user: {
+              ...currentUserRef.current,
+              isFocused: !document.hidden,
+              lastActiveAt: Date.now(),
+            },
+          })
+        );
+      } catch {}
 
       // Flush any queued offline messages
       if (pendingOutboxRef.current.length > 0) {
@@ -87,7 +106,9 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       pingIntervalRef.current = window.setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "ping" }));
+          try {
+            ws.send(JSON.stringify({ type: "ping" }));
+          } catch {}
         }
       }, 25000);
     };
@@ -209,7 +230,6 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
           }
 
           case "typing_status": {
-            // Filter out current user from typing indicator
             const others = data.typingUsers.filter(
               (u) => u.id !== currentUserRef.current.id
             );
@@ -225,7 +245,6 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
       setStatus("disconnected");
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
 
-      // Auto-reconnect after 2 seconds
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = window.setTimeout(() => {
         if (isMountedRef.current) {
@@ -238,21 +257,19 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
       if (!isMountedRef.current) return;
       setStatus("disconnected");
     };
-  }, [roomId, sendPacket]);
+  }, [roomId]);
 
   useEffect(() => {
     isMountedRef.current = true;
     connect();
 
-    // Listen to network status
     const handleOnline = () => {
-      if (status !== "connected") {
+      if (socketRef.current?.readyState !== WebSocket.OPEN) {
         connect();
       }
     };
     window.addEventListener("online", handleOnline);
 
-    // Track tab focus / visibility changes (Items 5, 6, 10)
     const handleVisibilityChange = () => {
       const isFocused = !document.hidden;
       sendPacket({
@@ -260,7 +277,6 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
         isFocused,
         lastActiveAt: Date.now(),
       });
-      // If we returned to the tab and connection was lost, reconnect immediately
       if (isFocused && socketRef.current?.readyState !== WebSocket.OPEN) {
         connect();
       }
@@ -304,7 +320,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
         } catch {}
       }
     };
-  }, [connect, sendPacket, status]);
+  }, [roomId, connect, sendPacket]); // Crucial: NO status in dependencies!
 
   // Actions
   const sendMessage = useCallback(
@@ -374,7 +390,6 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
   const reactMessage = useCallback(
     (messageId: string, emoji: string) => {
-      // Optimistic reaction toggle (Item 16)
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== messageId) return m;

@@ -152,8 +152,8 @@ export class RoomDurableObject extends DurableObject {
           const user = data.user;
           if (!user?.id || !user?.name) return;
 
-          // Sanitize user name and attributes
-          const cleanName = user.name.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 32);
+          // Sanitize user name and attributes (Max 16 chars as requested)
+          const cleanName = user.name.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 16);
           if (!cleanName) return;
           user.name = cleanName;
           user.isFocused = true;
@@ -309,8 +309,8 @@ export class RoomDurableObject extends DurableObject {
           if (!text && !imageBase64 && !gifUrl) return;
 
           if (text) {
-            text = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").trim();
-            if (!text || text.length > 4000) return;
+            text = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").trim().slice(0, 2000);
+            if (!text) return;
           }
 
           if (imageBase64) {
@@ -392,8 +392,8 @@ export class RoomDurableObject extends DurableObject {
           const msg = this.messages[messageIndex];
           if (msg.userId !== attachment.userId) return;
 
-          const newText = data.text?.trim();
-          if (!newText || newText.length > 10000) return;
+          const newText = data.text?.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").trim().slice(0, 2000);
+          if (!newText) return;
 
           msg.text = newText;
           msg.editedAt = Date.now();
@@ -545,7 +545,7 @@ export class RoomDurableObject extends DurableObject {
           const user = this.users.get(attachment.userId);
           if (!user) return;
 
-          if (data.name && data.name.trim()) user.name = data.name.trim().slice(0, 32);
+          if (data.name && data.name.trim()) user.name = data.name.trim().slice(0, 16);
           if (data.color) user.color = data.color;
 
           this.users.set(user.id, user);

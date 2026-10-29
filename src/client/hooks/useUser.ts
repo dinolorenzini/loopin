@@ -44,8 +44,10 @@ export function useUser() {
 
     let name = localStorage.getItem("loopin_user_name");
     if (!name) {
-      name = generateRandomName();
+      name = generateRandomName().slice(0, 16);
       localStorage.setItem("loopin_user_name", name);
+    } else {
+      name = name.slice(0, 16);
     }
 
     let color = localStorage.getItem("loopin_user_color");
@@ -66,7 +68,8 @@ export function useUser() {
 
   const updateUser = useCallback((updates: Partial<Pick<User, "name" | "color">>) => {
     setUser((prev) => {
-      const next = { ...prev, ...updates };
+      const sanitizedName = updates.name !== undefined ? updates.name.trim().slice(0, 16) : prev.name;
+      const next = { ...prev, ...updates, name: sanitizedName };
       if (typeof window !== "undefined") {
         if (updates.name !== undefined) localStorage.setItem("loopin_user_name", next.name);
         if (updates.color !== undefined) localStorage.setItem("loopin_user_color", next.color);

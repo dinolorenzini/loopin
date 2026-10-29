@@ -13,6 +13,7 @@ import {
   Pin,
 } from "lucide-react";
 import type { User } from "../../server/types";
+import { LoopinLogo } from "./LoopinLogo";
 
 interface RoomHeaderProps {
   roomId: string;
@@ -59,7 +60,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
 
   return (
     <header className="room-header">
-      {/* Left: Brand + Room pill (Item 18: responsive layout fix for <845px) */}
+      {/* Left: Brand + Room pill */}
       <div className="header-left">
         <button
           type="button"
@@ -67,7 +68,8 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           onClick={onLeaveRoom}
           title="Back to Loopin Home"
         >
-          <img src="/favicon.svg" alt="Loopin" className="brand-logo-img" />
+          {/* Item 5: Logo live updates with theme color */}
+          <LoopinLogo size={26} glow={true} />
           <span className="brand-name">Loopin</span>
         </button>
 
@@ -89,52 +91,47 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
         </div>
       </div>
 
-      {/* Right: Controls & actions */}
+      {/* Right: Controls & actions (Item 7: responsive without overlapping at 436px) */}
       <div className="header-right">
-        {/* Audio chime toggle */}
-        <button
-          type="button"
-          className={`header-icon-btn ${soundMuted ? "muted" : "active"}`}
-          onClick={onToggleSound}
-          title={soundMuted ? "Unmute message chime" : "Mute message chime"}
-        >
-          {soundMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-        </button>
+        {/* Secondary controls hidden on ultra-small screens to prevent overlap */}
+        <div className="header-secondary-tools">
+          <button
+            type="button"
+            className={`header-icon-btn ${soundMuted ? "muted" : "active"}`}
+            onClick={onToggleSound}
+            title={soundMuted ? "Unmute chime" : "Mute chime"}
+          >
+            {soundMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+          </button>
 
-        {/* Browser notification toggle */}
-        <button
-          type="button"
-          className={`header-icon-btn ${notificationPermission === "granted" ? "active" : ""}`}
-          onClick={onRequestNotifications}
-          title={
-            notificationPermission === "granted"
-              ? "Browser notifications active"
-              : notificationPermission === "denied"
-              ? "Notifications blocked by browser"
-              : "Enable browser notifications"
-          }
-        >
-          {notificationPermission === "granted" ? <Bell size={16} /> : <BellOff size={16} />}
-        </button>
+          <button
+            type="button"
+            className={`header-icon-btn ${notificationPermission === "granted" ? "active" : ""}`}
+            onClick={onRequestNotifications}
+            title="Notifications"
+          >
+            {notificationPermission === "granted" ? <Bell size={15} /> : <BellOff size={15} />}
+          </button>
+        </div>
 
         {/* Share & QR Code */}
         <button
           type="button"
           className="header-icon-btn"
           onClick={onOpenShare}
-          title="Share room & QR code"
+          title="Share room"
         >
-          <Share2 size={16} />
+          <Share2 size={15} />
         </button>
 
-        {/* Settings modal button (Item 14) */}
+        {/* Settings modal button */}
         <button
           type="button"
           className="header-icon-btn"
           onClick={onOpenSettings}
-          title="Settings (Themes, Background, Messages)"
+          title="Settings"
         >
-          <Settings size={16} />
+          <Settings size={15} />
         </button>
 
         {/* Online Members sidebar button */}
@@ -142,15 +139,15 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           type="button"
           className={`header-pill-btn ${isSidebarOpen || isSidebarPinned ? "selected" : ""}`}
           onClick={onToggleSidebar}
-          title={isSidebarPinned ? "Members pinned" : "View online members"}
+          title={isSidebarPinned ? "Members pinned" : "Online members"}
         >
           <span className="live-dot" />
-          <Users size={15} />
+          <Users size={14} />
           <span className="online-num">{onlineCount}</span>
           {isSidebarPinned && <Pin size={10} className="pinned-badge-icon" />}
         </button>
 
-        {/* User profile button (Item 3: no profile picture, username with color) */}
+        {/* User profile button (Item 8: Entire username displayed without truncation) */}
         <button
           type="button"
           className="user-profile-badge-btn"
@@ -171,7 +168,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           onClick={onLeaveRoom}
           title="Leave room"
         >
-          <LogOut size={16} />
+          <LogOut size={15} />
         </button>
       </div>
     </header>

@@ -9,6 +9,7 @@ import {
   Clock,
 } from "lucide-react";
 import type { Message } from "../../server/types";
+import { MarkdownRenderer } from "../utils/markdown";
 
 interface MessageItemProps {
   message: Message;
@@ -173,7 +174,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             </div>
           ) : (
             <>
-              {message.text && <p className="msg-text">{message.text}</p>}
+              {message.text && (
+                <div className="msg-text">
+                  <MarkdownRenderer content={message.text} />
+                </div>
+              )}
 
               {message.imageBase64 && (
                 <div

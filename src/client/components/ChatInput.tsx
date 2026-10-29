@@ -260,8 +260,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           placeholder="Message or paste image (Ctrl+V)..."
           className="chat-textarea"
           rows={1}
+          maxLength={2000}
           disabled={disabled}
         />
+
+        {text.length > 1800 && (
+          <span className="char-limit-indicator" title="Character limit: 2000">
+            {text.length}/2000
+          </span>
+        )}
 
         <button
           type="button"

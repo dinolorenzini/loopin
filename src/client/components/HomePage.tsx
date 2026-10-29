@@ -10,6 +10,7 @@ import type { User } from "../../server/types";
 import { useSettings } from "../hooks/useSettings";
 import { ChatBackground } from "./ChatBackground";
 import { SettingsModal } from "./SettingsModal";
+import { LoopinLogo } from "./LoopinLogo";
 
 interface HomePageProps {
   onJoinRoom: (room: string) => void;
@@ -82,12 +83,8 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   return (
     <div className="home-container">
-      {/* Background canvas replacing static gradient circles (Item 20) */}
-      <ChatBackground
-        type={settings.background}
-        accentColor={settings.themeColor}
-        noAnimations={settings.noAnimations}
-      />
+      {/* Background canvas live updating from Settings Context */}
+      <ChatBackground />
 
       {/* Top Bar for Settings */}
       <header className="home-top-bar">
@@ -102,9 +99,9 @@ export const HomePage: React.FC<HomePageProps> = ({
       </header>
 
       <main className="home-content">
-        {/* Brand Hero (Items 11, 12, 13: Clean SVG without wrap box or sparkle) */}
+        {/* Brand Hero (Logo color updates with theme) */}
         <div className="home-hero">
-          <img src="/favicon.svg" alt="Loopin" className="home-logo-bare" />
+          <LoopinLogo size={60} className="home-logo-bare" glow={true} />
           <h1 className="home-title">
             Loop<span className="text-accent">in</span>
           </h1>

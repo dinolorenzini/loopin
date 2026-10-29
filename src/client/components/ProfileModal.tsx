@@ -85,9 +85,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 id="user-display-name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={32}
-                placeholder="Enter your name..."
+                onChange={(e) => setName(e.target.value.slice(0, 16))}
+                maxLength={16}
+                placeholder="Enter your name (max 16)..."
                 className="text-input"
                 autoFocus
                 required

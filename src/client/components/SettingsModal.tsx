@@ -9,13 +9,15 @@ import {
   Trash2,
   Check,
   AlertTriangle,
+  Sliders,
+  Gauge,
+  Eye,
 } from "lucide-react";
 import {
   useSettings,
   THEME_PRESETS,
   BACKGROUND_OPTIONS,
   type MessageStyle,
-  type BackgroundType,
 } from "../hooks/useSettings";
 
 interface SettingsModalProps {
@@ -64,12 +66,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       <div className="profile-modal-content settings-modal-content">
         <div className="profile-modal-header">
           <div className="modal-title-with-icon">
-            <div className="settings-icon-badge" style={{ backgroundColor: "var(--bg-subtle)" }}>
+            <div className="settings-icon-badge">
               <Settings size={20} color="var(--primary-accent)" />
             </div>
             <div>
-              <h2 id="settings-dialog-title" className="modal-title">Settings</h2>
-              <p className="modal-subtitle">Customize theme, appearance & preferences</p>
+              <h2 id="settings-dialog-title" className="modal-title">Preferences & Appearance</h2>
+              <p className="modal-subtitle">Customize theme, shaders, backgrounds, and layout</p>
             </div>
           </div>
           <button
@@ -83,13 +85,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         </div>
 
         <div className="settings-scroll-area">
-          {/* 1. Theme Color (Item 15: Yellow default, preset + custom) */}
+          {/* 1. Theme Color Accent */}
           <section className="settings-section">
             <div className="settings-section-header">
               <Palette size={15} className="text-accent" />
-              <span className="settings-section-title">Theme Accent</span>
+              <span className="settings-section-title">Brand Theme Accent</span>
             </div>
-            <p className="settings-section-desc">Single static brand color for Loopin</p>
+            <p className="settings-section-desc">Single static brand color for Loopin icons, logos, and UI</p>
 
             <div className="theme-presets-grid">
               {THEME_PRESETS.map((t) => (
@@ -110,7 +112,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </button>
               ))}
 
-              {/* Custom Color Input */}
               <label className="custom-color-picker-label" title="Custom Hex Color">
                 <input
                   type="color"
@@ -123,13 +124,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             </div>
           </section>
 
-          {/* 2. Chat Background (Item 20: Animated & Static backgrounds) */}
+          {/* 2. Chat Background */}
           <section className="settings-section">
             <div className="settings-section-header">
               <Sparkles size={15} className="text-accent" />
-              <span className="settings-section-title">Chat & Home Background</span>
+              <span className="settings-section-title">Background Style</span>
             </div>
-            <p className="settings-section-desc">Applies to your personal view (Telegram style)</p>
+            <p className="settings-section-desc">Live-updating interactive backgrounds for Home and Chat</p>
 
             <div className="background-options-grid">
               {BACKGROUND_OPTIONS.map((bg) => (
@@ -158,7 +159,72 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             </div>
           </section>
 
-          {/* 3. Chat Messages Style (Item 14) */}
+          {/* 3. Background Controls: Darkness, Blur & Shader Speed */}
+          <section className="settings-section settings-controls-box">
+            <div className="settings-section-header">
+              <Sliders size={15} className="text-accent" />
+              <span className="settings-section-title">Background Tuning & Shaders</span>
+            </div>
+
+            <div className="sliders-grid">
+              {/* Darkness Dim Slider (Bug 2) */}
+              <div className="slider-control-group">
+                <div className="slider-label-row">
+                  <span className="slider-title">
+                    <Eye size={13} /> Darkness Overlay
+                  </span>
+                  <span className="slider-val">{Math.round(settings.bgDim * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="0.95"
+                  step="0.05"
+                  value={settings.bgDim}
+                  onChange={(e) => updateSetting("bgDim", parseFloat(e.target.value))}
+                  className="settings-range-slider"
+                />
+              </div>
+
+              {/* Blur Slider (Bug 2) */}
+              <div className="slider-control-group">
+                <div className="slider-label-row">
+                  <span className="slider-title">Background Blur</span>
+                  <span className="slider-val">{settings.bgBlur}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="20"
+                  step="1"
+                  value={settings.bgBlur}
+                  onChange={(e) => updateSetting("bgBlur", parseInt(e.target.value, 10))}
+                  className="settings-range-slider"
+                />
+              </div>
+
+              {/* Shader Speed Slider (Feature) */}
+              <div className="slider-control-group">
+                <div className="slider-label-row">
+                  <span className="slider-title">
+                    <Gauge size={13} /> Animation Speed
+                  </span>
+                  <span className="slider-val">{settings.shaderSpeed.toFixed(2)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.25"
+                  max="2.5"
+                  step="0.25"
+                  value={settings.shaderSpeed}
+                  onChange={(e) => updateSetting("shaderSpeed", parseFloat(e.target.value))}
+                  className="settings-range-slider"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* 4. Chat Messages Style */}
           <section className="settings-section">
             <div className="settings-section-header">
               <Layout size={15} className="text-accent" />
@@ -185,7 +251,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             </div>
           </section>
 
-          {/* 4. No Animations (Item 14, 19, 21) */}
+          {/* 5. No Animations */}
           <section className="settings-section">
             <div className="settings-toggle-row">
               <div className="settings-toggle-info">
@@ -194,7 +260,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   <span className="settings-section-title">No Animations</span>
                 </div>
                 <p className="settings-section-desc">
-                  Disables UI transitions & canvas animations (recommended for low-end laptops & Chromebooks)
+                  Completely stops all background shaders and transitions for maximum battery and Chromebook performance
                 </p>
               </div>
               <label className="switch-label">
@@ -209,11 +275,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             </div>
           </section>
 
-          {/* 5. Quick Clear Local Data (Item 14) */}
+          {/* 6. Quick Clear Local Data */}
           <section className="settings-section settings-danger-zone">
             <div className="settings-section-header">
               <Trash2 size={15} className="text-danger" />
-              <span className="settings-section-title text-danger">Data & Storage</span>
+              <span className="settings-section-title text-danger">Local Data & Storage</span>
             </div>
             <p className="settings-section-desc">
               Instantly wipe all local profiles, recent rooms, and settings from this browser.
@@ -222,7 +288,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             {confirmClear ? (
               <div className="confirm-clear-box">
                 <AlertTriangle size={16} className="text-danger" />
-                <span>Are you sure? This resets all local data.</span>
+                <span>Are you sure? This resets all local data immediately.</span>
                 <div className="confirm-clear-actions">
                   <button
                     type="button"

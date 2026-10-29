@@ -184,12 +184,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
 
   return (
     <div className={`room-layout ${isSidebarPinned ? "has-pinned-sidebar" : ""}`}>
-      {/* Background layer (Item 20) */}
-      <ChatBackground
-        type={settings.background}
-        accentColor={settings.themeColor}
-        noAnimations={settings.noAnimations}
-      />
+      {/* Background layer (live updating from Settings Context) */}
+      <ChatBackground />
 
       {/* Header */}
       <RoomHeader
