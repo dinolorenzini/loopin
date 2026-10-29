@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Users, X, Pin, PinOff, UserCheck, Edit3 } from "lucide-react";
+import { Users, X, Pin, PinOff, Edit3 } from "lucide-react";
 import type { User } from "../../server/types";
 
 interface UsersSidebarProps {
@@ -42,16 +42,35 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
     return () => clearInterval(timer);
   }, []);
 
+  // Deduplicate members by stable user ID to prevent clone entries
+  const uniqueUsers = React.useMemo(() => {
+    const map = new Map<string, User>();
+    for (const u of users) {
+      if (u && u.id) {
+        map.set(u.id, u);
+      }
+    }
+    return Array.from(map.values());
+  }, [users]);
+
+  const onlineUsers = uniqueUsers.filter((u) => u.isOnline !== false);
+  const offlineUsers = uniqueUsers.filter((u) => u.isOnline === false);
+
   return (
     <aside
       className={`users-sidebar ${isOpen ? "open" : ""} ${isPinned ? "pinned" : ""}`}
-      aria-label="Online Participants"
+      aria-label="Room Participants"
     >
       <div className="users-sidebar-header">
         <div className="sidebar-title-row">
           <Users size={16} className="text-accent" />
-          <span className="sidebar-title">Online Members</span>
-          <span className="users-count-pill">{users.length}</span>
+          <span className="sidebar-title">Members</span>
+          <span
+            className="users-count-pill"
+            title={`${onlineUsers.length} online, ${users.length} total`}
+          >
+            {onlineUsers.length}/{users.length}
+          </span>
         </div>
 
         <div className="sidebar-header-actions">
@@ -80,46 +99,88 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
 
       <div className="users-list-scroll">
         <div className="users-list">
-          {users.map((u) => {
-            const isMe = u.id === currentUserId;
-            const isTyping = typingUsers.some((t) => t.id === u.id);
-            const isFocused = u.isFocused !== false;
+          {onlineUsers.length > 0 && (
+            <div className="users-group-section">
+              <span className="users-group-heading">ONLINE — {onlineUsers.length}</span>
+              {onlineUsers.map((u) => {
+                const isMe = u.id === currentUserId;
+                const isTyping = typingUsers.some((t) => t.id === u.id);
+                const isFocused = u.isFocused !== false;
 
-            return (
-              <div key={u.id} className={`user-card ${isMe ? "user-card-me" : ""}`}>
-                {/* Status Dot: Green if active/focused, Yellow if unfocused (Item 10) */}
-                <div className="user-status-indicator-wrap">
-                  <span
-                    className={`user-dot ${isFocused ? "dot-active" : "dot-inactive"}`}
-                    title={isFocused ? "Focused & active" : "Unfocused / in background"}
-                  />
-                </div>
+                return (
+                  <div key={u.id} className={`user-card ${isMe ? "user-card-me" : ""}`}>
+                    {/* Status Dot: Green if active/focused, Yellow if unfocused (Item 10) */}
+                    <div className="user-status-indicator-wrap">
+                      <span
+                        className={`user-dot ${isFocused ? "dot-active" : "dot-inactive"}`}
+                        title={isFocused ? "Focused & active" : "Unfocused / in background"}
+                      />
+                    </div>
 
-                <div className="user-info">
-                  <div className="user-name-row">
-                    <span
-                      className="user-name-text"
-                      style={{ color: u.color || "var(--text-primary)" }}
-                    >
-                      {u.name}
-                    </span>
-                    {isMe && <span className="you-tag">YOU</span>}
+                    <div className="user-info">
+                      <div className="user-name-row">
+                        <span
+                          className="user-name-text"
+                          style={{ color: u.color || "var(--text-primary)" }}
+                        >
+                          {u.name}
+                        </span>
+                        {isMe && <span className="you-tag">YOU</span>}
+                      </div>
+
+                      {/* Status label: "typing...", "active now", or "last active X ago" (Item 10) */}
+                      {isTyping ? (
+                        <span className="user-status-text typing-text">typing...</span>
+                      ) : isFocused ? (
+                        <span className="user-status-text status-active">active now</span>
+                      ) : (
+                        <span className="user-status-text status-idle">
+                          last active {formatLastActive(u.lastActiveAt)}
+                        </span>
+                      )}
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          )}
 
-                  {/* Status label: "typing...", "active now", or "last active X ago" (Item 10) */}
-                  {isTyping ? (
-                    <span className="user-status-text typing-text">typing...</span>
-                  ) : isFocused ? (
-                    <span className="user-status-text status-active">active now</span>
-                  ) : (
-                    <span className="user-status-text status-idle">
-                      last active {formatLastActive(u.lastActiveAt)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {offlineUsers.length > 0 && (
+            <div className="users-group-section offline-section">
+              <span className="users-group-heading">OFFLINE — {offlineUsers.length}</span>
+              {offlineUsers.map((u) => {
+                const isMe = u.id === currentUserId;
+
+                return (
+                  <div
+                    key={u.id}
+                    className={`user-card user-card-offline ${isMe ? "user-card-me" : ""}`}
+                  >
+                    {/* Status Dot: Muted Gray for Offline */}
+                    <div className="user-status-indicator-wrap">
+                      <span className="user-dot dot-offline" title="Offline" />
+                    </div>
+
+                    <div className="user-info">
+                      <div className="user-name-row">
+                        <span
+                          className="user-name-text user-name-offline"
+                          style={{ color: u.color || "var(--text-primary)" }}
+                        >
+                          {u.name}
+                        </span>
+                        {isMe && <span className="you-tag">YOU</span>}
+                      </div>
+
+                      <span className="user-status-text status-offline">
+                        offline · last active {formatLastActive(u.lastActiveAt)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

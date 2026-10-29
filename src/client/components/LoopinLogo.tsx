@@ -10,7 +10,6 @@ interface LoopinLogoProps {
 export const LoopinLogo: React.FC<LoopinLogoProps> = ({
   size = 32,
   className = "",
-  glow = true,
 }) => {
   const { settings } = useSettings();
   const color = settings.themeColor || "var(--primary-accent)";
@@ -25,14 +24,6 @@ export const LoopinLogo: React.FC<LoopinLogoProps> = ({
       className={className}
       style={{ display: "block" }}
     >
-      <defs>
-        {glow && (
-          <filter id={`loopin-glow-${size}`} x="-30%" y="-30%" width="160%" height="160%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feComposite in="SourceGraphic" in2="blur" operator="over" />
-          </filter>
-        )}
-      </defs>
       <rect width="64" height="64" rx="16" fill="#09090b" />
       <rect width="64" height="64" rx="16" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
       <path
@@ -41,7 +32,6 @@ export const LoopinLogo: React.FC<LoopinLogoProps> = ({
         strokeWidth="5"
         strokeLinecap="round"
         strokeLinejoin="round"
-        filter={glow ? `url(#loopin-glow-${size})` : undefined}
       />
     </svg>
   );

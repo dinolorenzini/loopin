@@ -34,13 +34,16 @@ export default {
         return stub.fetch(roomReq);
       }
 
-      if (parts.length >= 4 && parts[3] === "stats") {
+      if (parts.length >= 4 && (parts[3] === "stats" || parts[3] === "check")) {
         const rawRoomId = parts[2].toLowerCase();
         const roomId = rawRoomId.replace(/[^a-z0-9_-]/g, "").slice(0, 64) || "general";
 
         const id = env.ROOMS.idFromName(roomId);
         const stub = env.ROOMS.get(id);
-        return stub.fetch(request);
+        const newUrl = new URL(request.url);
+        newUrl.searchParams.set("room", roomId);
+        const roomReq = new Request(newUrl.toString(), request);
+        return stub.fetch(roomReq);
       }
     }
 

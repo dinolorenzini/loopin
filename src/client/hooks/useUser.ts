@@ -2,16 +2,18 @@ import { useState, useCallback } from "react";
 import type { User } from "../../server/types";
 
 export const USER_COLORS = [
-  "#facc15", // Loopin Yellow (Default)
-  "#38bdf8", // Sky
-  "#818cf8", // Indigo
-  "#c084fc", // Purple
-  "#f472b6", // Pink
-  "#fb7185", // Rose
-  "#f97316", // Orange
-  "#34d399", // Emerald
-  "#2dd4bf", // Teal
-  "#a78bfa", // Violet
+  "#facc15", // Loopin Gold
+  "#38bdf8", // Sky Blue
+  "#34d399", // Emerald Green
+  "#c084fc", // Vivid Purple
+  "#fb7185", // Coral Rose
+  "#fb923c", // Tangerine Orange
+  "#2dd4bf", // Mint Teal
+  "#f472b6", // Bright Pink
+  "#818cf8", // Electric Indigo
+  "#a3e635", // Bright Lime
+  "#60a5fa", // Light Azure
+  "#e879f9", // Orchid Magenta
 ];
 
 function generateRandomName(): string {
@@ -35,12 +37,13 @@ export function useUser() {
       };
     }
 
-    // Use session-specific ID so multiple tabs on the same computer can chat independently (fixes items 5 & 6)
-    let id = sessionStorage.getItem("loopin_tab_user_id");
+    // Stable user ID across tabs, reconnects, and page refreshes (Fixes Item 1 duplicate members)
+    let id = localStorage.getItem("loopin_user_id") || sessionStorage.getItem("loopin_tab_user_id");
     if (!id) {
       id = crypto.randomUUID();
-      sessionStorage.setItem("loopin_tab_user_id", id);
     }
+    localStorage.setItem("loopin_user_id", id);
+    sessionStorage.setItem("loopin_tab_user_id", id);
 
     let name = localStorage.getItem("loopin_user_name");
     if (!name) {
@@ -50,10 +53,10 @@ export function useUser() {
       name = name.slice(0, 16);
     }
 
+    // Random name color when first joining, stable for the session/reconnects (Fixes Item 2)
     let color = localStorage.getItem("loopin_user_color");
-    if (!color) {
-      // Loopin default color is Yellow (Item 15)
-      color = USER_COLORS[0];
+    if (!color || !USER_COLORS.includes(color)) {
+      color = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
       localStorage.setItem("loopin_user_color", color);
     }
 

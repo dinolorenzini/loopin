@@ -69,7 +69,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           title="Back to Loopin Home"
         >
           {/* Item 5: Logo live updates with theme color */}
-          <LoopinLogo size={26} glow={true} />
+          <LoopinLogo size={26} />
           <span className="brand-name">Loopin</span>
         </button>
 

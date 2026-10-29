@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import {
   Pencil,
   Trash2,
@@ -7,8 +7,9 @@ import {
   CheckCheck,
   X,
   Clock,
+  Reply,
 } from "lucide-react";
-import type { Message } from "../../server/types";
+import type { Message, User } from "../../server/types";
 import { MarkdownRenderer } from "../utils/markdown";
 
 interface MessageItemProps {
@@ -17,13 +18,36 @@ interface MessageItemProps {
   currentUserId: string;
   isFirstInGroup: boolean;
   isLastInGroup: boolean;
+  users?: User[];
   onEdit: (id: string, newText: string) => void;
   onDelete: (id: string) => void;
   onReact: (id: string, emoji: string) => void;
   onExpandImage: (url: string) => void;
+  onReply: (message: Message) => void;
+  onScrollToMessage: (targetId: string) => void;
+  isTargetAvailable?: (targetId: string) => boolean;
 }
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "🔥", "🚀", "😮"];
+
+function getInitials(name: string): string {
+  if (!name) return "?";
+  const clean = name.replace(/[\x00-\x1F\x7F]/g, "").trim();
+  const parts = clean.split(/[\s-]+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+function getContrastTextColor(hexColor?: string): string {
+  if (!hexColor || !hexColor.startsWith("#")) return "#09090b";
+  const hex = hexColor.replace("#", "");
+  const r = parseInt(hex.slice(0, 2), 16) || 0;
+  const g = parseInt(hex.slice(2, 4), 16) || 0;
+  const b = parseInt(hex.slice(4, 6), 16) || 0;
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 150 ? "#09090b" : "#ffffff";
+}
 
 export const MessageItem: React.FC<MessageItemProps> = ({
   message,
@@ -31,18 +55,25 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   currentUserId,
   isFirstInGroup,
   isLastInGroup,
+  users = [],
   onEdit,
   onDelete,
   onReact,
   onExpandImage,
+  onReply,
+  onScrollToMessage,
+  isTargetAvailable,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.text || "");
   const [showEmojiMenu, setShowEmojiMenu] = useState(false);
-  const editInputRef = useRef<HTMLInputElement>(null);
-  const emojiMenuRef = useRef<HTMLDivElement>(null);
+  const [showReadersPopover, setShowReadersPopover] = useState(false);
 
-  // Close emoji popover on outside click (Item 16)
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const emojiMenuRef = useRef<HTMLDivElement>(null);
+  const readersRef = useRef<HTMLDivElement>(null);
+
+  // Close emoji popover on outside click
   useEffect(() => {
     if (!showEmojiMenu) return;
     const handleOutsideClick = (e: MouseEvent) => {
@@ -54,15 +85,36 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [showEmojiMenu]);
 
+  // Close readers popover on outside click
   useEffect(() => {
-    if (isEditing && editInputRef.current) {
-      editInputRef.current.focus();
-      editInputRef.current.select();
+    if (!showReadersPopover) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (readersRef.current && !readersRef.current.contains(e.target as Node)) {
+        setShowReadersPopover(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [showReadersPopover]);
+
+  // Auto-resize textarea seamlessly inside message bubble
+  useLayoutEffect(() => {
+    if (isEditing && editTextareaRef.current) {
+      editTextareaRef.current.focus();
+      // Select cursor at end
+      editTextareaRef.current.setSelectionRange(editText.length, editText.length);
+      editTextareaRef.current.style.height = "auto";
+      editTextareaRef.current.style.height = `${editTextareaRef.current.scrollHeight}px`;
     }
   }, [isEditing]);
 
-  const handleSaveEdit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditText(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = `${e.target.scrollHeight}px`;
+  };
+
+  const handleSaveEdit = () => {
     const clean = editText.trim();
     if (clean && clean !== message.text) {
       onEdit(message.id, clean);
@@ -70,11 +122,17 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     setIsEditing(false);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  // Keyboard handling for inline editing: Enter saves, Escape cancels, Shift+Enter adds newline
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
+      // Modern IME-safety: prevent premature submission when converting characters
+      if (e.nativeEvent.isComposing || (e as any).keyCode === 229) {
+        return;
+      }
       e.preventDefault();
       handleSaveEdit();
     } else if (e.key === "Escape") {
+      e.preventDefault();
       setIsEditing(false);
       setEditText(message.text || "");
     }
@@ -85,29 +143,47 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     minute: "2-digit",
   });
 
-  const isRead = Boolean(message.readBy && message.readBy.some((id) => id !== message.userId));
-
-  // System Announcement Row (Item 7)
+  // System Announcement Row
   if (message.isSystem) {
     return (
-      <div className="system-announcement-row">
+      <div id={`msg-${message.id}`} className="system-announcement-row">
         <span className="system-pill">{message.text}</span>
         <span className="system-time">{timeFormatted}</span>
       </div>
     );
   }
 
+  // Calculate readers (excluding author)
+  const rawReaderIds = (message.readBy || []).filter((id) => id !== message.userId);
+  const readerUsers: User[] = rawReaderIds.map((id) => {
+    const found = users.find((u) => u.id === id);
+    return (
+      found || {
+        id,
+        name: id === currentUserId ? "You" : "Member",
+        color: "#94a3b8",
+        joinedAt: 0,
+      }
+    );
+  });
+
+  const isReplyAvailable =
+    !message.replyTo || (isTargetAvailable ? isTargetAvailable(message.replyTo.id) : true);
+
   const groupClasses = [
     isFirstInGroup ? "group-start" : "group-middle",
     isLastInGroup ? "group-end" : "",
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
+      id={`msg-${message.id}`}
       className={`message-row ${isMe ? "message-row-me" : "message-row-other"} ${groupClasses}`}
     >
       <div className="msg-content-wrapper">
-        {/* Header with username and external timestamp (Item 2 & 3: time outside message, no avatars) */}
+        {/* Header with username, timestamp, and read status */}
         {isFirstInGroup && (
           <div className="msg-outside-header">
             {!isMe && (
@@ -116,59 +192,156 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               </span>
             )}
             <span className="msg-timestamp-outside">{timeFormatted}</span>
+
+            {/* Read Receipts & Status */}
             {isMe && (
-              <span
-                className="msg-status-wrap"
-                title={
-                  message.status === "sending"
-                    ? "Sending..."
-                    : isRead
-                    ? "Read"
-                    : "Delivered"
-                }
-              >
+              <div className="msg-status-receipts" ref={readersRef}>
                 {message.status === "sending" ? (
-                  <Clock size={11} className="status-sending-icon" />
-                ) : isRead ? (
-                  <CheckCheck size={13} className="status-read-icon" />
+                  <span className="msg-status-wrap" title="Sending...">
+                    <Clock size={11} className="status-sending-icon" />
+                  </span>
+                ) : readerUsers.length === 0 ? (
+                  <span className="msg-status-wrap" title="Delivered">
+                    <Check size={12} className="status-delivered-icon" />
+                  </span>
                 ) : (
-                  <Check size={12} className="status-delivered-icon" />
+                  <div
+                    className="readers-avatars-row"
+                    onClick={() => setShowReadersPopover(!showReadersPopover)}
+                    title={`Read by: ${readerUsers.map((r) => r.name).join(", ")}`}
+                  >
+                    {readerUsers.slice(0, 3).map((reader) => (
+                      <span
+                        key={reader.id}
+                        className="reader-avatar-badge"
+                        style={{
+                          backgroundColor: reader.color || "var(--primary-accent)",
+                          color: getContrastTextColor(reader.color),
+                        }}
+                      >
+                        {getInitials(reader.name)}
+                      </span>
+                    ))}
+
+                    {readerUsers.length > 3 && (
+                      <span className="reader-avatar-badge reader-avatar-more">
+                        +{readerUsers.length - 3}
+                      </span>
+                    )}
+
+                    {readerUsers.length === 1 && (
+                      <span className="reader-single-name">
+                        {readerUsers[0].name}
+                      </span>
+                    )}
+
+                    <CheckCheck size={12} className="status-read-icon" />
+
+                    {showReadersPopover && (
+                      <div className="readers-popover-card" onClick={(e) => e.stopPropagation()}>
+                        <div className="readers-popover-title">Read by ({readerUsers.length})</div>
+                        <div className="readers-popover-list">
+                          {readerUsers.map((r) => (
+                            <div key={r.id} className="reader-popover-item">
+                              <span
+                                className="reader-avatar-badge small"
+                                style={{
+                                  backgroundColor: r.color || "var(--primary-accent)",
+                                  color: getContrastTextColor(r.color),
+                                }}
+                              >
+                                {getInitials(r.name)}
+                              </span>
+                              <span className="reader-popover-name" style={{ color: r.color }}>
+                                {r.name}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </span>
+              </div>
             )}
           </div>
         )}
 
+        {/* Message Bubble */}
         <div className={`msg-bubble ${isMe ? "bubble-me" : "bubble-other"}`}>
-          {isEditing ? (
-            <div className="inline-edit-box">
-              <input
-                ref={editInputRef}
-                type="text"
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="inline-edit-input"
+          {/* Quoted Reply Preview */}
+          {message.replyTo && (
+            <div
+              className={`msg-quoted-preview ${!isReplyAvailable ? "unavailable" : ""}`}
+              onClick={() => isReplyAvailable && onScrollToMessage(message.replyTo!.id)}
+              role={isReplyAvailable ? "button" : undefined}
+              tabIndex={isReplyAvailable ? 0 : undefined}
+              title={
+                isReplyAvailable
+                  ? `Jump to ${message.replyTo.userName}'s message`
+                  : "Original message is no longer available"
+              }
+            >
+              <div
+                className="quoted-accent-bar"
+                style={{ backgroundColor: message.replyTo.userColor || "var(--primary-accent)" }}
               />
-              <div className="inline-edit-actions">
+              <div className="quoted-content-col">
+                <span
+                  className="quoted-user-name"
+                  style={{ color: message.replyTo.userColor || "var(--primary-accent)" }}
+                >
+                  {message.replyTo.userName}
+                </span>
+                <span className="quoted-text-snippet">
+                  {message.replyTo.text ||
+                    (message.replyTo.imageBase64
+                      ? "📷 Photo"
+                      : message.replyTo.gifUrl
+                      ? "🎬 GIF"
+                      : "Message")}
+                </span>
+              </div>
+              {!isReplyAvailable && (
+                <span className="quoted-unavailable-pill">deleted</span>
+              )}
+            </div>
+          )}
+
+          {/* Inline Edit or Content */}
+          {isEditing ? (
+            <div className="inline-edit-container">
+              <textarea
+                ref={editTextareaRef}
+                value={editText}
+                onChange={handleTextareaInput}
+                onKeyDown={handleKeyDown}
+                className="inline-edit-textarea"
+                rows={1}
+                maxLength={2000}
+                aria-label="Edit message"
+              />
+              <div className="inline-edit-buttons">
                 <button
                   type="button"
-                  className="edit-action-btn btn-save"
-                  onClick={() => handleSaveEdit()}
-                  title="Save (Enter)"
+                  className="inline-edit-btn save-btn"
+                  onClick={handleSaveEdit}
+                  title="Save changes (Enter)"
                 >
-                  <Check size={14} />
+                  <Check size={12} />
+                  <span>Save</span>
                 </button>
                 <button
                   type="button"
-                  className="edit-action-btn btn-cancel"
+                  className="inline-edit-btn cancel-btn"
                   onClick={() => {
                     setIsEditing(false);
                     setEditText(message.text || "");
                   }}
-                  title="Cancel (Esc)"
+                  title="Cancel edit (Escape)"
                 >
-                  <X size={14} />
+                  <X size={12} />
+                  <span>Cancel</span>
                 </button>
               </div>
             </div>
@@ -224,6 +397,17 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           {/* Action Toolbar on hover */}
           {!isEditing && (
             <div className="msg-hover-toolbar">
+              {/* Reply Button */}
+              <button
+                type="button"
+                className="hover-action-btn"
+                onClick={() => onReply(message)}
+                title="Reply to message"
+              >
+                <Reply size={13} />
+              </button>
+
+              {/* Reaction Trigger */}
               <div className="reaction-trigger-wrap" ref={emojiMenuRef}>
                 <button
                   type="button"
@@ -279,13 +463,13 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           )}
         </div>
 
-        {/* Existing Reactions Pill List (Item 16: fixed UI and highlight own reaction) */}
+        {/* Existing Reactions Pill List */}
         {message.reactions && Object.keys(message.reactions).length > 0 && (
           <div className="reactions-display-row">
-            {Object.entries(message.reactions).map(([emoji, users]) => {
-              const count = users.length;
+            {Object.entries(message.reactions).map(([emoji, userIds]) => {
+              const count = userIds.length;
               if (count === 0) return null;
-              const hasReacted = users.includes(currentUserId);
+              const hasReacted = userIds.includes(currentUserId);
               return (
                 <button
                   key={emoji}

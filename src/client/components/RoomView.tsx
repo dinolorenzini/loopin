@@ -19,7 +19,7 @@ import { ShareModal } from "./ShareModal";
 import { ImageLightbox } from "./ImageLightbox";
 import { ChatBackground } from "./ChatBackground";
 import { processImageToBase64 } from "../utils/image";
-import type { User } from "../../server/types";
+import type { User, Message } from "../../server/types";
 
 interface RoomViewProps {
   roomId: string;
@@ -44,10 +44,12 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const initialScrollDoneRef = useRef<boolean>(false);
+  const hasCheckedFirstJoinRef = useRef<boolean>(false);
 
   const { settings } = useSettings();
 
@@ -77,6 +79,41 @@ export const RoomView: React.FC<RoomViewProps> = ({
     currentUser,
     onNewMessage,
   });
+
+  // Auto-show share modal if user is the first person to join the room
+  useEffect(() => {
+    if (status === "connected" && !hasCheckedFirstJoinRef.current) {
+      hasCheckedFirstJoinRef.current = true;
+      const otherActive = users.filter((u) => u.isOnline !== false && u.id !== currentUser.id);
+      if (otherActive.length === 0) {
+        setIsShareOpen(true);
+      }
+    }
+  }, [status, users, currentUser.id]);
+
+  const scrollToMessage = useCallback(
+    (targetId: string) => {
+      const element = document.getElementById(`msg-${targetId}`);
+      if (element) {
+        element.scrollIntoView({
+          behavior: settings.noAnimations ? "auto" : "smooth",
+          block: "center",
+        });
+        element.classList.remove("message-highlight");
+        void element.offsetWidth;
+        element.classList.add("message-highlight");
+        setTimeout(() => {
+          element.classList.remove("message-highlight");
+        }, 2000);
+      }
+    },
+    [settings.noAnimations]
+  );
+
+  const isTargetAvailable = useCallback(
+    (targetId: string) => messages.some((m) => m.id === targetId),
+    [messages]
+  );
 
   const handleTogglePin = useCallback(() => {
     setIsSidebarPinned((prev) => {
@@ -190,7 +227,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       {/* Header */}
       <RoomHeader
         roomId={roomId}
-        onlineCount={users.length}
+        onlineCount={users.filter((u) => u.isOnline !== false).length}
         currentUser={currentUser}
         onLeaveRoom={onLeaveRoom}
         onOpenShare={() => setIsShareOpen(true)}
@@ -271,10 +308,14 @@ export const RoomView: React.FC<RoomViewProps> = ({
                       currentUserId={currentUser.id}
                       isFirstInGroup={isFirstInGroup}
                       isLastInGroup={isLastInGroup}
+                      users={users}
                       onEdit={editMessage}
                       onDelete={deleteMessage}
                       onReact={reactMessage}
                       onExpandImage={(url) => setLightboxImage(url)}
+                      onReply={(targetMsg) => setReplyingTo(targetMsg)}
+                      onScrollToMessage={scrollToMessage}
+                      isTargetAvailable={isTargetAvailable}
                     />
                   );
                 })}
@@ -283,12 +324,14 @@ export const RoomView: React.FC<RoomViewProps> = ({
             )}
           </div>
 
-          {/* Input Bar with Discord-style typing indicator (Item 1) */}
+          {/* Input Bar with Discord-style typing indicator and reply bar */}
           <ChatInput
             onSendMessage={sendMessage}
             onTyping={sendTyping}
             disabled={status !== "connected"}
             typingUsers={typingUsers}
+            replyingTo={replyingTo}
+            onCancelReply={() => setReplyingTo(null)}
           />
         </div>
 

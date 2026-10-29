@@ -47,7 +47,7 @@ export const BACKGROUND_OPTIONS: { id: BackgroundType; name: string; isAnimated:
 
 const DEFAULT_SETTINGS: SettingsState = {
   themeColor: "#facc15",
-  background: "starfield",
+  background: "minimal-dark",
   bgDim: 0.45,
   bgBlur: 0,
   shaderSpeed: 1.0,
@@ -71,7 +71,15 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       const saved = localStorage.getItem("loopin_settings");
       if (saved) {
-        return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        // Seamlessly migrate previous session default ("starfield") to new "minimal-dark" default
+        if (!localStorage.getItem("loopin_v2_dark_default")) {
+          localStorage.setItem("loopin_v2_dark_default", "true");
+          if (parsed.background === "starfield") {
+            parsed.background = "minimal-dark";
+          }
+        }
+        return { ...DEFAULT_SETTINGS, ...parsed };
       }
     } catch {}
     return DEFAULT_SETTINGS;

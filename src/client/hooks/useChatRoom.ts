@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { ClientMessage, Message, ServerMessage, User } from "../../server/types";
+import type { ClientMessage, Message, ServerMessage, User, ReplyReference } from "../../server/types";
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected";
 
@@ -84,6 +84,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
               ...currentUserRef.current,
               isFocused: !document.hidden,
               lastActiveAt: Date.now(),
+              isOnline: true,
             },
           })
         );
@@ -124,20 +125,35 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
           case "init": {
             setMessages(data.messages || []);
-            setUsers(data.users || []);
+            const userMap = new Map<string, User>();
+            for (const u of data.users || []) {
+              if (u && u.id) userMap.set(u.id, u);
+            }
+            setUsers(Array.from(userMap.values()));
             break;
           }
 
           case "user_joined": {
             setUsers((prev) => {
-              if (prev.some((u) => u.id === data.user.id)) return prev;
-              return [...prev, data.user];
+              const exists = prev.some((u) => u.id === data.user.id);
+              if (exists) {
+                return prev.map((u) =>
+                  u.id === data.user.id ? { ...u, ...data.user, isOnline: true } : u
+                );
+              }
+              return [...prev, { ...data.user, isOnline: true }];
             });
             break;
           }
 
           case "user_left": {
-            setUsers((prev) => prev.filter((u) => u.id !== data.userId));
+            setUsers((prev) =>
+              prev.map((u) =>
+                u.id === data.userId
+                  ? { ...u, isOnline: false, isFocused: false, lastActiveAt: Date.now() }
+                  : u
+              )
+            );
             setTypingUsers((prev) => prev.filter((u) => u.id !== data.userId));
             break;
           }
@@ -263,6 +279,13 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
     isMountedRef.current = true;
     connect();
 
+    const handleBeforeUnload = () => {
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.close();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     const handleOnline = () => {
       if (socketRef.current?.readyState !== WebSocket.OPEN) {
         connect();
@@ -310,6 +333,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       window.removeEventListener("online", handleOnline);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("blur", handleBlur);
@@ -324,7 +348,17 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
   // Actions
   const sendMessage = useCallback(
-    ({ text, imageBase64, gifUrl }: { text?: string; imageBase64?: string; gifUrl?: string }) => {
+    ({
+      text,
+      imageBase64,
+      gifUrl,
+      replyTo,
+    }: {
+      text?: string;
+      imageBase64?: string;
+      gifUrl?: string;
+      replyTo?: ReplyReference;
+    }) => {
       const tempId = crypto.randomUUID();
       const user = currentUserRef.current;
 
@@ -337,6 +371,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
         text,
         imageBase64,
         gifUrl,
+        replyTo,
         timestamp: Date.now(),
         reactions: {},
         status: "sending",
@@ -351,6 +386,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
         text,
         imageBase64,
         gifUrl,
+        replyTo,
       });
     },
     [roomId, sendPacket]

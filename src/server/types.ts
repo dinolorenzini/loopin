@@ -6,10 +6,21 @@ export interface User {
   joinedAt: number;
   isFocused?: boolean;
   lastActiveAt?: number;
+  isOnline?: boolean;
 }
 
 export interface MessageReaction {
   [emoji: string]: string[]; // array of userIds
+}
+
+export interface ReplyReference {
+  id: string;
+  userId: string;
+  userName: string;
+  userColor?: string;
+  text?: string;
+  imageBase64?: string;
+  gifUrl?: string;
 }
 
 export interface Message {
@@ -22,6 +33,7 @@ export interface Message {
   text?: string;
   imageBase64?: string; // stored directly in message payload as requested
   gifUrl?: string;
+  replyTo?: ReplyReference;
   timestamp: number;
   editedAt?: number;
   reactions?: MessageReaction;
@@ -32,7 +44,7 @@ export interface Message {
 
 export type ClientMessage =
   | { type: "join"; user: User }
-  | { type: "send_message"; id?: string; text?: string; imageBase64?: string; gifUrl?: string }
+  | { type: "send_message"; id?: string; text?: string; imageBase64?: string; gifUrl?: string; replyTo?: ReplyReference }
   | { type: "edit_message"; id: string; text: string }
   | { type: "delete_message"; id: string }
   | { type: "react_message"; messageId: string; emoji: string }

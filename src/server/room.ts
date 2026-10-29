@@ -34,6 +34,7 @@ export class RoomDurableObject extends DurableObject {
           text TEXT,
           imageBase64 TEXT,
           gifUrl TEXT,
+          replyToJson TEXT,
           timestamp INTEGER,
           editedAt INTEGER,
           reactionsJson TEXT,
@@ -41,6 +42,10 @@ export class RoomDurableObject extends DurableObject {
           isSystem INTEGER
         );
       `);
+
+      try {
+        this.ctx.storage.sql.exec("ALTER TABLE messages ADD COLUMN replyToJson TEXT;");
+      } catch {}
 
       this.ctx.storage.sql.exec(`
         CREATE TABLE IF NOT EXISTS users (
@@ -67,6 +72,7 @@ export class RoomDurableObject extends DurableObject {
           joinedAt: Number(u.joinedAt),
           isFocused: Boolean(u.isFocused),
           lastActiveAt: Number(u.lastActiveAt) || Date.now(),
+          isOnline: false,
         });
       }
 
@@ -80,11 +86,15 @@ export class RoomDurableObject extends DurableObject {
   private rowToMessage(row: any): Message {
     let reactions: MessageReaction | undefined;
     let readBy: string[] | undefined;
+    let replyTo: any | undefined;
     try {
       if (row.reactionsJson) reactions = JSON.parse(row.reactionsJson as string);
     } catch {}
     try {
       if (row.readByJson) readBy = JSON.parse(row.readByJson as string);
+    } catch {}
+    try {
+      if (row.replyToJson) replyTo = JSON.parse(row.replyToJson as string);
     } catch {}
 
     return {
@@ -96,6 +106,7 @@ export class RoomDurableObject extends DurableObject {
       text: (row.text as string) || undefined,
       imageBase64: (row.imageBase64 as string) || undefined,
       gifUrl: (row.gifUrl as string) || undefined,
+      replyTo,
       timestamp: Number(row.timestamp),
       editedAt: row.editedAt ? Number(row.editedAt) : undefined,
       reactions,
@@ -126,11 +137,13 @@ export class RoomDurableObject extends DurableObject {
       });
     }
 
-    if (url.pathname.endsWith("/stats")) {
+    if (url.pathname.endsWith("/stats") || url.pathname.endsWith("/check")) {
+      const activeSockets = this.ctx.getWebSockets().filter((s) => s.readyState === WebSocket.OPEN);
       return Response.json({
         room: this.roomId,
-        onlineCount: this.ctx.getWebSockets().length,
+        onlineCount: activeSockets.length,
         messageCount: this.messages.length,
+        taken: activeSockets.length > 0 || this.messages.length > 0,
       });
     }
 
@@ -157,6 +170,7 @@ export class RoomDurableObject extends DurableObject {
           if (!cleanName) return;
           user.name = cleanName;
           user.isFocused = true;
+          user.isOnline = true;
           user.lastActiveAt = Date.now();
 
           const attachment: SocketAttachment = {
@@ -165,14 +179,15 @@ export class RoomDurableObject extends DurableObject {
           };
           ws.serializeAttachment(attachment);
 
-          this.users.set(user.id, user);
-
           let sockets = this.userSockets.get(user.id);
+          const wasAlreadyOnline = Boolean(sockets && sockets.size > 0 && this.users.get(user.id)?.isOnline);
           if (!sockets) {
             sockets = new Set();
             this.userSockets.set(user.id, sockets);
           }
           sockets.add(ws);
+
+          this.users.set(user.id, user);
 
           // Save user to SQLite
           try {
@@ -193,33 +208,38 @@ export class RoomDurableObject extends DurableObject {
             );
           } catch {}
 
-          // Generate System Announcement for user joining the room (Item 7)
-          const joinMsg: Message = {
-            id: crypto.randomUUID(),
-            roomId: this.roomId,
-            userId: "system",
-            userName: "System",
-            userColor: "#facc15",
-            text: `${user.name} joined the room`,
-            timestamp: Date.now(),
-            isSystem: true,
-            status: "delivered",
-          };
-          this.messages.push(joinMsg);
+          let joinMsg: Message | undefined;
 
-          try {
-            this.ctx.storage.sql.exec(
-              `INSERT INTO messages (id, roomId, userId, userName, userColor, text, timestamp, isSystem) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-              joinMsg.id,
-              joinMsg.roomId,
-              joinMsg.userId,
-              joinMsg.userName,
-              joinMsg.userColor,
-              joinMsg.text || "",
-              joinMsg.timestamp
-            );
-          } catch {}
+          // Only generate announcement and broadcast join if the user was NOT already online in the room
+          // (Deduplication prevents clone entries and duplicate join announcements across reconnects & multiple tabs)
+          if (!wasAlreadyOnline) {
+            joinMsg = {
+              id: crypto.randomUUID(),
+              roomId: this.roomId,
+              userId: "system",
+              userName: "System",
+              userColor: "#facc15",
+              text: `${user.name} joined the room`,
+              timestamp: Date.now(),
+              isSystem: true,
+              status: "delivered",
+            };
+            this.messages.push(joinMsg);
+
+            try {
+              this.ctx.storage.sql.exec(
+                `INSERT INTO messages (id, roomId, userId, userName, userColor, text, timestamp, isSystem) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+                joinMsg.id,
+                joinMsg.roomId,
+                joinMsg.userId,
+                joinMsg.userName,
+                joinMsg.userColor,
+                joinMsg.text || "",
+                joinMsg.timestamp
+              );
+            } catch {}
+          }
 
           // Send initialization data to the newly joined client
           this.sendTo(ws, {
@@ -230,22 +250,34 @@ export class RoomDurableObject extends DurableObject {
             selfId: user.id,
           });
 
-          // Broadcast user_joined and the system message to all other clients
-          this.broadcast(
-            {
-              type: "user_joined",
-              user,
-            },
-            ws
-          );
+          // Broadcast user_joined or user_updated to all other clients
+          if (!wasAlreadyOnline) {
+            this.broadcast(
+              {
+                type: "user_joined",
+                user,
+              },
+              ws
+            );
 
-          this.broadcast(
-            {
-              type: "new_message",
-              message: joinMsg,
-            },
-            ws
-          );
+            if (joinMsg) {
+              this.broadcast(
+                {
+                  type: "new_message",
+                  message: joinMsg,
+                },
+                ws
+              );
+            }
+          } else {
+            this.broadcast(
+              {
+                type: "user_updated",
+                user,
+              },
+              ws
+            );
+          }
           break;
         }
 
@@ -333,6 +365,22 @@ export class RoomDurableObject extends DurableObject {
             }
           }
 
+          let replyTo = data.replyTo;
+          if (replyTo && (!replyTo.id || !replyTo.userName)) {
+            replyTo = undefined;
+          }
+          if (replyTo) {
+            replyTo = {
+              id: String(replyTo.id).slice(0, 64),
+              userId: String(replyTo.userId).slice(0, 64),
+              userName: String(replyTo.userName).slice(0, 16),
+              userColor: replyTo.userColor ? String(replyTo.userColor).slice(0, 32) : undefined,
+              text: replyTo.text ? String(replyTo.text).slice(0, 300) : undefined,
+              imageBase64: replyTo.imageBase64 ? "attached" : undefined,
+              gifUrl: replyTo.gifUrl,
+            };
+          }
+
           const messageId = data.id || crypto.randomUUID();
           const message: Message = {
             id: messageId,
@@ -343,6 +391,7 @@ export class RoomDurableObject extends DurableObject {
             text: text || undefined,
             imageBase64: imageBase64 || undefined,
             gifUrl: gifUrl || undefined,
+            replyTo,
             timestamp: Date.now(),
             reactions: {},
             status: "delivered",
@@ -354,8 +403,8 @@ export class RoomDurableObject extends DurableObject {
           // Save message to SQLite
           try {
             this.ctx.storage.sql.exec(
-              `INSERT INTO messages (id, roomId, userId, userName, userColor, text, imageBase64, gifUrl, timestamp, reactionsJson, readByJson, isSystem) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+              `INSERT INTO messages (id, roomId, userId, userName, userColor, text, imageBase64, gifUrl, replyToJson, timestamp, reactionsJson, readByJson, isSystem) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
               message.id,
               message.roomId,
               message.userId,
@@ -364,6 +413,7 @@ export class RoomDurableObject extends DurableObject {
               message.text || null,
               message.imageBase64 || null,
               message.gifUrl || null,
+              message.replyTo ? JSON.stringify(message.replyTo) : null,
               message.timestamp,
               JSON.stringify(message.reactions || {}),
               JSON.stringify(message.readBy || [])
@@ -493,7 +543,7 @@ export class RoomDurableObject extends DurableObject {
 
         case "mark_read": {
           const attachment = ws.deserializeAttachment() as SocketAttachment | null;
-          if (!attachment?.userId || !Array.isArray(data.messageIds)) return;
+          if (!attachment?.userId) return;
 
           const updatedIds: string[] = [];
           for (const mid of data.messageIds) {
@@ -589,28 +639,38 @@ export class RoomDurableObject extends DurableObject {
         if (sockets.size === 0) {
           this.userSockets.delete(userId);
           const user = this.users.get(userId);
-          this.users.delete(userId);
           this.typingUsers.delete(userId);
-
-          try {
-            this.ctx.storage.sql.exec("DELETE FROM users WHERE id = ?", userId);
-          } catch {}
+          this.broadcastTypingStatus();
 
           if (user) {
+            // Keep user in memory and DB but mark as offline
+            user.isOnline = false;
+            user.isFocused = false;
+            user.lastActiveAt = Date.now();
+            this.users.set(userId, user);
+
+            try {
+              this.ctx.storage.sql.exec(
+                "UPDATE users SET isFocused = 0, lastActiveAt = ? WHERE id = ?",
+                user.lastActiveAt,
+                userId
+              );
+            } catch {}
+
             this.broadcast({
               type: "user_left",
               userId: user.id,
               userName: user.name,
             });
 
-            // System Announcement for user leaving
+            // System Announcement for user going offline
             const leaveMsg: Message = {
               id: crypto.randomUUID(),
               roomId: this.roomId,
               userId: "system",
               userName: "System",
               userColor: "#facc15",
-              text: `${user.name} left the room`,
+              text: `${user.name} went offline`,
               timestamp: Date.now(),
               isSystem: true,
               status: "delivered",
@@ -630,8 +690,8 @@ export class RoomDurableObject extends DurableObject {
       .getWebSockets()
       .filter((s) => s !== ws && s.readyState === WebSocket.OPEN);
 
-    // CRITICAL: When all users leave a room/disconnect, wipe all messages and state
-    if (activeSockets.length === 0 || this.users.size === 0) {
+    // Ephemeral auto-wipe when all users disconnect from the room
+    if (activeSockets.length === 0) {
       this.messages = [];
       this.users.clear();
       this.userSockets.clear();
@@ -666,28 +726,21 @@ export class RoomDurableObject extends DurableObject {
     });
   }
 
-  private broadcast(message: ServerMessage, excludeWs?: WebSocket): void {
-    const payload = JSON.stringify(message);
-    const sockets = this.ctx.getWebSockets();
-
-    for (const socket of sockets) {
-      if (socket !== excludeWs && socket.readyState === WebSocket.OPEN) {
-        try {
-          socket.send(payload);
-        } catch {
-          // Socket write failed, will be pruned
-        }
-      }
-    }
+  private sendTo(ws: WebSocket, message: ServerMessage): void {
+    try {
+      ws.send(JSON.stringify(message));
+    } catch {}
   }
 
-  private sendTo(ws: WebSocket, message: ServerMessage): void {
-    if (ws.readyState === WebSocket.OPEN) {
+  private broadcast(message: ServerMessage, excludeWs?: WebSocket): void {
+    const sockets = this.ctx.getWebSockets();
+    const payload = JSON.stringify(message);
+
+    for (const ws of sockets) {
+      if (excludeWs && ws === excludeWs) continue;
       try {
-        ws.send(JSON.stringify(message));
-      } catch {
-        // Socket write failed
-      }
+        ws.send(payload);
+      } catch {}
     }
   }
 }

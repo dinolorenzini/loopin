@@ -6,16 +6,25 @@ import {
   Film,
   Loader2,
   X,
+  Reply,
 } from "lucide-react";
 import { EmojiPicker } from "./EmojiPicker";
 import { GifPicker } from "./GifPicker";
 import { processImageToBase64 } from "../utils/image";
+import type { Message, ReplyReference } from "../../server/types";
 
 interface ChatInputProps {
-  onSendMessage: (payload: { text?: string; imageBase64?: string; gifUrl?: string }) => void;
+  onSendMessage: (payload: {
+    text?: string;
+    imageBase64?: string;
+    gifUrl?: string;
+    replyTo?: ReplyReference;
+  }) => void;
   onTyping: (isTyping: boolean) => void;
   disabled?: boolean;
   typingUsers?: { id: string; name: string }[];
+  replyingTo?: Message | null;
+  onCancelReply?: () => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -23,6 +32,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onTyping,
   disabled = false,
   typingUsers = [],
+  replyingTo = null,
+  onCancelReply,
 }) => {
   const [text, setText] = useState("");
   const [pendingImage, setPendingImage] = useState<string | null>(null);
@@ -40,9 +51,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, [disabled]);
 
+  // Focus textarea when replyingTo changes
+  useEffect(() => {
+    if (replyingTo && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [replyingTo]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setText(val);
+
+    // Auto-resize
+    e.target.style.height = "auto";
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 180)}px`;
 
     if (val.trim()) {
       onTyping(true);
@@ -59,15 +81,33 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const cleanText = text.trim();
     if (!cleanText && !pendingImage) return;
 
+    let replyRef: ReplyReference | undefined;
+    if (replyingTo) {
+      replyRef = {
+        id: replyingTo.id,
+        userId: replyingTo.userId,
+        userName: replyingTo.userName,
+        userColor: replyingTo.userColor,
+        text: replyingTo.text,
+        imageBase64: replyingTo.imageBase64 ? "attached" : undefined,
+        gifUrl: replyingTo.gifUrl,
+      };
+    }
+
     onSendMessage({
       text: cleanText || undefined,
       imageBase64: pendingImage || undefined,
+      replyTo: replyRef,
     });
 
     setText("");
     setPendingImage(null);
     onTyping(false);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    if (onCancelReply) {
+      onCancelReply();
+    }
 
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -76,8 +116,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
+      // Modern IME-safety: prevent premature submission when converting characters
+      if (e.nativeEvent.isComposing || (e as any).keyCode === 229) {
+        return;
+      }
       e.preventDefault();
       handleSend();
+    } else if (e.key === "Escape") {
+      if (replyingTo && onCancelReply) {
+        e.preventDefault();
+        onCancelReply();
+      }
     }
   };
 
@@ -127,7 +176,44 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className="chat-input-wrapper">
-      {/* Discord-style typing indicator directly above input bar (Item 1) */}
+      {/* "Replying to <user>" bar above input with preview and cancel button */}
+      {replyingTo && (
+        <div className="composing-reply-bar">
+          <div
+            className="reply-bar-indicator"
+            style={{ backgroundColor: replyingTo.userColor || "var(--primary-accent)" }}
+          />
+          <Reply
+            size={14}
+            className="reply-bar-icon"
+            style={{ color: replyingTo.userColor || "var(--primary-accent)" }}
+          />
+          <div className="reply-bar-content">
+            <span className="reply-bar-title">
+              Replying to <strong style={{ color: replyingTo.userColor || "inherit" }}>{replyingTo.userName}</strong>
+            </span>
+            <span className="reply-bar-snippet">
+              {replyingTo.text ||
+                (replyingTo.imageBase64
+                  ? "📷 Photo"
+                  : replyingTo.gifUrl
+                  ? "🎬 GIF"
+                  : "Original message")}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="reply-bar-cancel-btn"
+            onClick={onCancelReply}
+            aria-label="Cancel reply"
+            title="Cancel reply (Esc)"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Discord-style typing indicator directly above input bar */}
       <div className={`discord-typing-bar ${typingUsers.length > 0 ? "visible" : ""}`}>
         {typingUsers.length > 0 && (
           <>
@@ -192,8 +278,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <div className="popover-anchor" onClick={(e) => e.stopPropagation()}>
             <GifPicker
               onSelectGif={(url) => {
-                onSendMessage({ gifUrl: url });
+                let replyRef: ReplyReference | undefined;
+                if (replyingTo) {
+                  replyRef = {
+                    id: replyingTo.id,
+                    userId: replyingTo.userId,
+                    userName: replyingTo.userName,
+                    userColor: replyingTo.userColor,
+                    text: replyingTo.text,
+                    gifUrl: url,
+                  };
+                }
+                onSendMessage({ gifUrl: url, replyTo: replyRef });
                 setShowGifPicker(false);
+                if (onCancelReply) onCancelReply();
               }}
               onClose={() => setShowGifPicker(false)}
             />
@@ -257,7 +355,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           value={text}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder="Message or paste image (Ctrl+V)..."
+          placeholder={replyingTo ? `Replying to ${replyingTo.userName}...` : "Message or paste image (Ctrl+V)..."}
           className="chat-textarea"
           rows={1}
           maxLength={2000}
