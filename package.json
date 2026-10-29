@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

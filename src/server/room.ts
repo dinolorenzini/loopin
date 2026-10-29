@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, Message, MessageReaction, ServerMessage, User } from "./types";
+import { TokenBucketRateLimiter } from "./rateLimiter";
 
 interface SocketAttachment {
   userId: string;
@@ -12,6 +13,7 @@ export class RoomDurableObject extends DurableObject {
   private users: Map<string, User> = new Map();
   private userSockets: Map<string, Set<WebSocket>> = new Map();
   private typingUsers: Map<string, number> = new Map();
+  private userLimiters: Map<string, TokenBucketRateLimiter> = new Map();
 
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
@@ -60,10 +62,16 @@ export class RoomDurableObject extends DurableObject {
           const user = data.user;
           if (!user?.id || !user?.name) return;
 
+          // Sanitize user name and attributes
+          const cleanName = user.name.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 32);
+          if (!cleanName) return;
+          user.name = cleanName;
+
           // If room has 0 active users, guarantee fresh ephemeral room
           if (this.users.size === 0) {
             this.messages = [];
             this.typingUsers.clear();
+            this.userLimiters.clear();
           }
 
           const attachment: SocketAttachment = {
@@ -108,16 +116,56 @@ export class RoomDurableObject extends DurableObject {
           const user = this.users.get(attachment.userId);
           if (!user) return;
 
-          const text = data.text?.trim();
+          // Token Bucket Rate Limiting (max 6 burst, 2 msgs/sec steady state)
+          let limiter = this.userLimiters.get(attachment.userId);
+          if (!limiter) {
+            limiter = new TokenBucketRateLimiter(6, 2);
+            this.userLimiters.set(attachment.userId, limiter);
+          }
+          if (!limiter.tryConsume(1)) {
+            this.sendTo(ws, {
+              type: "error",
+              message: "You are sending messages too quickly. Please wait a moment.",
+            });
+            return;
+          }
+
+          let text = data.text?.trim();
           const imageBase64 = data.imageBase64;
-          const gifUrl = data.gifUrl;
+          let gifUrl = data.gifUrl;
 
           // Message must contain at least text, image, or gif
           if (!text && !imageBase64 && !gifUrl) return;
 
-          // Enforce reasonable limits (text max 10k chars, imageBase64 max 7MB)
-          if (text && text.length > 10000) return;
-          if (imageBase64 && imageBase64.length > 7000000) return;
+          // Strict text sanitization: strip control characters, limit to 4000 chars
+          if (text) {
+            text = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "").trim();
+            if (!text || text.length > 4000) return;
+          }
+
+          // Strict image validation: prevent SVG XSS payloads and ensure valid Base64
+          if (imageBase64) {
+            const isSafeImage = /^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(imageBase64);
+            if (!isSafeImage || imageBase64.length > 5000000) {
+              this.sendTo(ws, {
+                type: "error",
+                message: "Invalid image format. Only PNG, JPEG, WebP, and GIF under 5MB are allowed.",
+              });
+              return;
+            }
+          }
+
+          // Strict GIF URL validation: require https protocol and prevent javascript: injection
+          if (gifUrl) {
+            try {
+              const parsed = new URL(gifUrl);
+              if (parsed.protocol !== "https:") {
+                return;
+              }
+            } catch {
+              return;
+            }
+          }
 
           const messageId = data.id || crypto.randomUUID();
           const message: Message = {
@@ -342,6 +390,7 @@ export class RoomDurableObject extends DurableObject {
       this.users.clear();
       this.userSockets.clear();
       this.typingUsers.clear();
+      this.userLimiters.clear();
       await this.ctx.storage.deleteAll();
     }
   }
