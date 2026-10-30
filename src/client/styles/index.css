@@ -6,14 +6,16 @@
 }
 
 :root {
-  /* Surface hierarchy (Dark default) */
-  --surface-bg: #09090b;       /* Application backdrop */
-  --surface-panel: #121215;    /* Modals, sidebars, header */
-  --surface-raised: #18181b;   /* Cards, input bars, other's bubbles */
-  --surface-hover: #222226;    /* Hover state */
-  --border-color: #27272a;     /* 1px neutral border */
-  --border-subtle: #27272a;
-  --border-hover: #3f3f46;
+  color-scheme: dark;
+
+  /* Surface hierarchy (Dark default: True Zinc palette) */
+  --surface-bg: #09090b;       /* Application backdrop (zinc-950) */
+  --surface-panel: #18181b;    /* Modals, sidebars, header (zinc-900) */
+  --surface-raised: #27272a;   /* Cards, input bars, other's bubbles (zinc-800) */
+  --surface-hover: #3f3f46;    /* Hover state (zinc-700) */
+  --border-color: #27272a;     /* 1px neutral border (zinc-800) */
+  --border-subtle: #27272a;    /* zinc-800 */
+  --border-hover: #52525b;     /* zinc-600 */
 
   /* Typography Colors */
   --text-primary: #f4f4f5;
@@ -64,6 +66,7 @@
 
 /* Light Mode Surfaces */
 [data-theme="light"] {
+  color-scheme: light;
   --surface-bg: #f4f4f5;
   --surface-panel: #ffffff;
   --surface-raised: #f4f4f5;
@@ -175,10 +178,50 @@ button {
   border: none;
   cursor: pointer;
   user-select: none;
+  transition: transform var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+/* ── Top-layer Native Dialog Global Base & Modern Animations ── */
+dialog {
+  color: var(--text-primary);
+  color-scheme: dark;
+  background: transparent;
+  border: none;
+  padding: 0;
+  opacity: 0;
+  transform: scale(0.97);
+  transition: opacity 160ms ease-out, transform 160ms ease-out, display 160ms allow-discrete, overlay 160ms allow-discrete;
+}
+[data-theme="light"] dialog {
+  color-scheme: light;
+}
+dialog[open] {
+  opacity: 1;
+  transform: scale(1);
+}
+@starting-style {
+  dialog[open] {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
+  opacity: 1;
+  transition: opacity 160ms ease-out, display 160ms allow-discrete, overlay 160ms allow-discrete;
+}
+@starting-style {
+  dialog[open]::backdrop {
+    opacity: 0;
+  }
 }
 
 :focus-visible {
@@ -236,21 +279,21 @@ button:disabled {
 .static-bg-minimal {
   position: absolute;
   inset: 0;
-  background-color: #0c0d11;
+  background-color: #09090b;
 }
 .static-bg-doodle {
   position: absolute;
   inset: 0;
-  background-color: #0f1015;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.22) 1.5px, transparent 1.5px);
+  background-color: #18181b;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.28) 1.5px, transparent 1.5px);
   background-size: 14px 14px;
 }
 .static-bg-grid {
   position: absolute;
   inset: 0;
-  background-color: #0b1120;
-  background-image: linear-gradient(to right, rgba(56, 189, 248, 0.25) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(56, 189, 248, 0.25) 1px, transparent 1px);
+  background-color: #18181b;
+  background-image: linear-gradient(to right, rgba(56, 189, 248, 0.3) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(56, 189, 248, 0.3) 1px, transparent 1px);
   background-size: 16px 16px;
 }
 
@@ -1522,6 +1565,17 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  animation: paneFadeIn 140ms ease-out;
+}
+@keyframes paneFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .pane-section {
@@ -1535,8 +1589,8 @@ button:disabled {
   color: var(--text-primary);
 }
 .section-desc {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 12.5px;
+  color: var(--text-secondary);
 }
 
 /* Theme Swatches (Solid 2px outline for selected state, NO glowing rings) */
@@ -1601,10 +1655,17 @@ button:disabled {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+.theme-mode-pill-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
 }
 .theme-mode-pill-btn.active {
   border-color: var(--primary-accent);
   color: var(--text-primary);
+  background: var(--surface-hover);
 }
 
 /* Choice Cards (Message style) */
@@ -1634,11 +1695,18 @@ button:disabled {
 .choice-card-title {
   font-size: 13px;
   font-weight: 600;
+  color: var(--text-primary);
   margin-bottom: 2px;
 }
 .choice-card-desc {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
+}
+.option-choice-card.selected .choice-card-title {
+  color: var(--text-primary);
+}
+.option-choice-card.selected .choice-card-desc {
+  color: var(--text-secondary);
 }
 
 /* Live Style Preview Card in Chat settings */
@@ -1650,10 +1718,10 @@ button:disabled {
 }
 .preview-label-tag {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
 }
 .chat-style-live-preview-card {
   background: var(--surface-bg);
@@ -2449,6 +2517,8 @@ button:disabled {
 
 /* ── Share Modal ── */
 .share-dialog {
+  position: fixed;
+  inset: 0;
   margin: auto;
   background: transparent;
   border: none;
@@ -2456,9 +2526,16 @@ button:disabled {
   outline: none;
   max-width: 420px;
   width: 90vw;
+  color: var(--text-primary);
+  color-scheme: dark;
+  z-index: 9999;
+}
+[data-theme="light"] .share-dialog {
+  color-scheme: light;
 }
 .share-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
 }
 .share-modal-content {
   background: var(--surface-panel);
@@ -2469,6 +2546,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  color: var(--text-primary);
 }
 .share-modal-header {
   display: flex;
@@ -2481,18 +2559,26 @@ button:disabled {
   gap: var(--space-2);
 }
 .share-modal-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.2px;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.3;
 }
 .share-modal-desc {
   font-size: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  margin-top: 2px;
 }
 .share-close-btn {
   color: var(--text-muted);
   padding: 4px;
   border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 .share-close-btn:hover {
   color: var(--text-primary);

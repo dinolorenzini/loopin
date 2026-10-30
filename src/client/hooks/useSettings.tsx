@@ -214,7 +214,7 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
 export const DEFAULT_SETTINGS: SettingsState = {
   themeColor: "#facc15",
   themeMode: "dark",
-  background: "minimal-dark",
+  background: "starfield",
   bgCustom: DEFAULT_BG_CONFIG,
   messageStyle: "modern",
   chatWidth: "contained",

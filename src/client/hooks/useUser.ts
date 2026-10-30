@@ -31,7 +31,7 @@ export function useUser() {
       return {
         id: "anon",
         name: "Guest",
-        color: USER_COLORS[0],
+        color: USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)],
         joinedAt: Date.now(),
         isFocused: true,
       };
@@ -53,12 +53,20 @@ export function useUser() {
       name = name.slice(0, 16);
     }
 
-    // Random name color when first joining, stable for the tab/reconnects
-    let color = sessionStorage.getItem("loopin_user_color") || localStorage.getItem("loopin_user_color");
-    if (!color || !USER_COLORS.includes(color)) {
-      color = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
-      localStorage.setItem("loopin_user_color", color);
+    // Random name color on first start, stable for tab and reconnects
+    let color = sessionStorage.getItem("loopin_user_color");
+    const hasCustomized = localStorage.getItem("loopin_user_color_customized") === "true";
+    if (!color) {
+      if (hasCustomized) {
+        color = localStorage.getItem("loopin_user_color") || "";
+      }
+      if (!color || !USER_COLORS.includes(color)) {
+        color = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
+      }
       sessionStorage.setItem("loopin_user_color", color);
+      if (hasCustomized) {
+        localStorage.setItem("loopin_user_color", color);
+      }
     }
 
     return {
@@ -81,6 +89,7 @@ export function useUser() {
         }
         if (updates.color !== undefined) {
           localStorage.setItem("loopin_user_color", next.color);
+          localStorage.setItem("loopin_user_color_customized", "true");
           sessionStorage.setItem("loopin_user_color", next.color);
         }
       }

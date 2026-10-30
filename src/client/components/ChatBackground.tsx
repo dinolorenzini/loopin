@@ -43,7 +43,8 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
     !performanceMode &&
     type !== "minimal-dark" &&
     type !== "blueprint-grid" &&
-    type !== "telegram-doodle";
+    type !== "telegram-doodle" &&
+    (!thumbnail || isHovered);
 
   // Mouse tracking on full canvas
   useEffect(() => {
@@ -70,23 +71,14 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
     if (!ctx) return;
 
     let animationFrameId: number;
-    let isWindowFocused = typeof document !== "undefined" ? document.hasFocus() : true;
     let isTabVisible = typeof document !== "undefined" ? !document.hidden : true;
 
     const onVisibilityChange = () => {
       isTabVisible = !document.hidden;
     };
-    const onFocus = () => {
-      isWindowFocused = true;
-    };
-    const onBlur = () => {
-      isWindowFocused = false;
-    };
 
     if (!thumbnail) {
       document.addEventListener("visibilitychange", onVisibilityChange);
-      window.addEventListener("focus", onFocus);
-      window.addEventListener("blur", onBlur);
     }
 
     const setSize = () => {
@@ -134,15 +126,18 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
     // ── 1. Warp Starfield ──
     if (type === "starfield") {
       const numStars = Math.floor(thumbnail ? 50 : (config.particleCount || 160));
-      const stars = Array.from({ length: numStars }, () => ({
-        x: (Math.random() - 0.5) * width * 1.8,
-        y: (Math.random() - 0.5) * height * 1.8,
-        z: Math.random() * width,
-        pz: width,
-      }));
+      const stars = Array.from({ length: numStars }, () => {
+        const z = Math.random() * (width - 20) + 10;
+        return {
+          x: (Math.random() - 0.5) * width * 1.8,
+          y: (Math.random() - 0.5) * height * 1.8,
+          z,
+          pz: z + (thumbnail ? 16 : 28),
+        };
+      });
 
       const render = () => {
-        if (!thumbnail && (!isTabVisible || !isWindowFocused)) {
+        if (!thumbnail && !isTabVisible) {
           animationFrameId = requestAnimationFrame(render);
           return;
         }
@@ -211,7 +206,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       }));
 
       const render = () => {
-        if (!thumbnail && (!isTabVisible || !isWindowFocused)) {
+        if (!thumbnail && !isTabVisible) {
           animationFrameId = requestAnimationFrame(render);
           return;
         }
@@ -276,7 +271,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
     // ── 3. Aurora Silk Waves ──
     else if (type === "aurora") {
-      let t = 0;
+      let t = thumbnail ? 1.2 : 0;
       const amp = config.waveAmp || 45;
       const freq = config.waveFreq || 0.0025;
 
@@ -302,7 +297,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       ];
 
       const render = () => {
-        if (!thumbnail && (!isTabVisible || !isWindowFocused)) {
+        if (!thumbnail && !isTabVisible) {
           animationFrameId = requestAnimationFrame(render);
           return;
         }
@@ -349,7 +344,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       const fontSize = thumbnail ? 9 : 13;
       const cols = Math.floor(width / fontSize);
       const drops: number[] = Array.from({ length: cols }, () =>
-        thumbnail ? Math.floor(Math.random() * (height / fontSize)) : Math.floor(Math.random() * -40)
+        Math.floor(Math.random() * (height / fontSize))
       );
       const chars =
         config.charSet === "binary"
@@ -359,7 +354,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
           : "01LOOPIN23456789ｱｳｴｵｶｷｹｺｻｼｽｾｿﾀﾂﾃﾅﾆﾇﾈﾊﾋﾎﾏﾐﾑﾒﾓﾔﾕﾗﾘﾜ";
 
       const render = () => {
-        if (!thumbnail && (!isTabVisible || !isWindowFocused)) {
+        if (!thumbnail && !isTabVisible) {
           animationFrameId = requestAnimationFrame(render);
           return;
         }
@@ -412,7 +407,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       }));
 
       const render = () => {
-        if (!thumbnail && (!isTabVisible || !isWindowFocused)) {
+        if (!thumbnail && !isTabVisible) {
           animationFrameId = requestAnimationFrame(render);
           return;
         }
@@ -467,7 +462,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       const horizonY = height * 0.55;
 
       const render = () => {
-        if (!thumbnail && (!isTabVisible || !isWindowFocused)) {
+        if (!thumbnail && !isTabVisible) {
           animationFrameId = requestAnimationFrame(render);
           return;
         }
@@ -551,12 +546,10 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       resizeObserver?.disconnect();
       if (!thumbnail) {
         document.removeEventListener("visibilitychange", onVisibilityChange);
-        window.removeEventListener("focus", onFocus);
-        window.removeEventListener("blur", onBlur);
         window.removeEventListener("resize", handleResize);
       }
     };
-  }, [type, accentColor, shouldAnimate, config, thumbnail, performanceMode]);
+  }, [type, accentColor, shouldAnimate, config, thumbnail, performanceMode, isHovered]);
 
   return (
     <div
