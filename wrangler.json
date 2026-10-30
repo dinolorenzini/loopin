@@ -23,5 +23,10 @@
       "tag": "v1",
       "new_sqlite_classes": ["RoomDurableObject"]
     }
-  ]
+  ],
+  "dev": {
+    "ip": "0.0.0.0",
+    "port": 8787,
+    "local_protocol": "http"
+  }
 }

@@ -16,6 +16,29 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    // Development & API CORS origin validation
+    const origin = request.headers.get("Origin");
+    const isAllowedOrigin =
+      !origin ||
+      origin.includes("100.101.178.123") ||
+      origin.includes("localhost") ||
+      origin.includes("127.0.0.1") ||
+      origin.includes("loopin.peretas.live");
+
+    // Handle OPTIONS preflight requests
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": isAllowedOrigin && origin ? origin : "*",
+          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Max-Age": "86400",
+        },
+      });
+    }
+
     // 1. WebSocket endpoint: /api/room/:roomId/ws
     if (url.pathname.startsWith("/api/room/")) {
       const parts = url.pathname.split("/").filter(Boolean); // ["api", "room", ":roomId", "ws"]
@@ -92,7 +115,7 @@ export default {
       headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
       headers.set(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://media.giphy.com https://*.giphy.com; connect-src 'self' wss: ws: https:; object-src 'none'; base-uri 'self';"
+        "default-src 'self' http://100.101.178.123:* ws://100.101.178.123:*; script-src 'self' 'unsafe-inline' http://100.101.178.123:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://media.giphy.com https://*.giphy.com http://100.101.178.123:*; connect-src 'self' http://100.101.178.123:* ws://100.101.178.123:* wss: ws: https:; object-src 'none'; base-uri 'self';"
       );
 
       return new Response(assetResponse.body, {
