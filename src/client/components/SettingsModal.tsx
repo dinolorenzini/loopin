@@ -166,11 +166,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (!dialog) return;
 
     if (isOpen) {
+      setIsPeekingBackground(false);
       setConfirmClear(false);
       if (!dialog.open) {
         dialog.showModal();
       }
     } else {
+      setIsPeekingBackground(false);
       if (dialog.open) {
         dialog.close();
       }
@@ -180,6 +182,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Handle Tab Switch & Remember
   const handleSelectTab = (tab: SettingsCategory) => {
+    setIsPeekingBackground(false);
     setActiveTab(tab);
     updateSetting("activeCategory", tab);
     if (contentPaneRef.current) {
@@ -228,9 +231,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const selectedBgId = settings.background;
-  const currentBgConfig = settings.bgCustom[selectedBgId] || DEFAULT_BG_CONFIG[selectedBgId];
-  const defaultBgConfig = DEFAULT_BG_CONFIG[selectedBgId];
+  const selectedBgId = settings.background || "minimal-dark";
+  const defaultBgConfig = DEFAULT_BG_CONFIG[selectedBgId] || DEFAULT_BG_CONFIG["minimal-dark"];
+  const currentBgConfig = settings.bgCustom?.[selectedBgId] || defaultBgConfig;
 
   const categories: { id: SettingsCategory; label: string; icon: LucideIcon }[] = [
     { id: "appearance", label: "Appearance", icon: Palette },

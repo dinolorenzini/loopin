@@ -1,6 +1,28 @@
 import React, { useRef, useEffect } from "react";
 import { useSettings, type BackgroundType, type BackgroundCustomConfig, DEFAULT_BG_CONFIG } from "../hooks/useSettings";
 
+function hexOrRgbToRgba(color: string, alpha: number): string {
+  if (!color) return `rgba(250, 204, 21, ${alpha})`;
+  const trimmed = color.trim();
+  if (trimmed.startsWith("#")) {
+    let hex = trimmed.slice(1);
+    if (hex.length === 3) {
+      hex = hex.split("").map((c) => c + c).join("");
+    }
+    const r = parseInt(hex.slice(0, 2), 16) || 0;
+    const g = parseInt(hex.slice(2, 4), 16) || 0;
+    const b = parseInt(hex.slice(4, 6), 16) || 0;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  if (trimmed.startsWith("rgb(")) {
+    return trimmed.replace("rgb(", "rgba(").replace(")", `, ${alpha})`);
+  }
+  if (trimmed.startsWith("rgba(")) {
+    return trimmed.replace(/[\d\.]+\)$/, `${alpha})`);
+  }
+  return trimmed;
+}
+
 interface ChatBackgroundProps {
   className?: string;
   typeOverride?: BackgroundType;
@@ -114,7 +136,8 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       ctx.fillRect(0, 0, width, height);
     };
 
-    // ── 0. Minimal Dark ──
+    try {
+      // ── 0. Minimal Dark ──
     if (type === "minimal-dark") {
       clearBackground();
       const grad = ctx.createRadialGradient(
@@ -225,7 +248,11 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
         if (itemType === 0) {
           // Chat bubble
           ctx.beginPath();
-          ctx.roundRect(-14, -10, 28, 20, 6);
+          if (typeof (ctx as any).roundRect === "function") {
+            (ctx as any).roundRect(-14, -10, 28, 20, 6);
+          } else {
+            ctx.rect(-14, -10, 28, 20);
+          }
           ctx.moveTo(-4, 10);
           ctx.lineTo(-8, 16);
           ctx.lineTo(2, 10);
@@ -441,7 +468,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
           const grad = ctx.createLinearGradient(0, baselineY - currentAmp, 0, height);
           const alpha = thumbnail ? 0.35 : 0.15 + frac * 0.15;
-          grad.addColorStop(0, accentColor.replace(")", `, ${alpha})`).replace("rgb", "rgba").replace("#", "rgba("));
+          grad.addColorStop(0, hexOrRgbToRgba(accentColor, alpha));
           grad.addColorStop(1, "rgba(9, 9, 11, 0.05)");
 
           ctx.fillStyle = i % 2 === 0 ? grad : `rgba(255, 255, 255, ${alpha * 0.35})`;
@@ -899,8 +926,11 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       };
       render();
     }
+  } catch (err) {
+    console.warn("ChatBackground render error:", err);
+  }
 
-    return () => {
+  return () => {
       cancelAnimationFrame(animationFrameId);
       resizeObserver?.disconnect();
       if (!thumbnail) {
