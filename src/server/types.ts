@@ -67,5 +67,6 @@ export type ServerMessage =
   | { type: "message_reacted"; messageId: string; reactions: MessageReaction }
   | { type: "messages_read"; messageIds: string[]; userId: string }
   | { type: "typing_status"; typingUsers: { id: string; name: string }[] }
+  | { type: "name_taken"; name: string; suggestedName?: string; message: string }
   | { type: "pong" }
   | { type: "error"; message: string };

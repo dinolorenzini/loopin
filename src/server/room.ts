@@ -118,13 +118,18 @@ export class RoomDurableObject extends DurableObject {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    const roomParam = url.searchParams.get("room")?.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 64);
+    if (roomParam) {
+      this.roomId = roomParam;
+    } else if (!this.roomId) {
+      this.roomId = "general";
+    }
 
     if (url.pathname.endsWith("/ws")) {
       if (request.headers.get("Upgrade") !== "websocket") {
         return new Response("Expected WebSocket", { status: 426 });
       }
 
-      this.roomId = url.searchParams.get("room") || "general";
       const webSocketPair = new WebSocketPair();
       const [client, server] = Object.values(webSocketPair);
 
@@ -150,6 +155,15 @@ export class RoomDurableObject extends DurableObject {
     return new Response("Not found", { status: 404 });
   }
 
+  private checkRateLimit(userId: string, tokens = 1): boolean {
+    let limiter = this.userLimiters.get(userId);
+    if (!limiter) {
+      limiter = new TokenBucketRateLimiter(8, 2);
+      this.userLimiters.set(userId, limiter);
+    }
+    return limiter.tryConsume(tokens);
+  }
+
   async webSocketMessage(ws: WebSocket, rawMessage: string | ArrayBuffer): Promise<void> {
     try {
       if (typeof rawMessage !== "string") return;
@@ -168,7 +182,35 @@ export class RoomDurableObject extends DurableObject {
           // Sanitize user name and attributes (Max 16 chars as requested)
           const cleanName = user.name.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 16);
           if (!cleanName) return;
+
+          // Check if another active user in the room already has this name (case-insensitive)
+          const lowerName = cleanName.toLowerCase();
+          let conflictUser: User | null = null;
+          for (const [existingId, existingUser] of this.users.entries()) {
+            if (existingId === user.id) continue; // Same user reconnecting or multi-tab
+            if (existingUser.name && existingUser.name.trim().toLowerCase() === lowerName) {
+              if (this.isUserOnline(existingId)) {
+                conflictUser = existingUser;
+                break;
+              }
+            }
+          }
+
+          if (conflictUser) {
+            const randSuffix = Math.floor(10 + Math.random() * 90);
+            const basePrefix = cleanName.slice(0, 13);
+            const suggested = `${basePrefix}-${randSuffix}`;
+            this.sendTo(ws, {
+              type: "name_taken",
+              name: cleanName,
+              suggestedName: suggested,
+              message: `The name "${cleanName}" is already taken by another active user in this room. Please choose a different name.`,
+            });
+            return;
+          }
+
           user.name = cleanName;
+          user.color = typeof user.color === "string" && /^#[0-9a-fA-F]{3,8}$/.test(user.color) ? user.color : "#facc15";
           user.isFocused = Boolean(data.user.isFocused);
           user.isOnline = true;
           user.lastActiveAt = Date.now();
@@ -357,13 +399,8 @@ export class RoomDurableObject extends DurableObject {
           const user = this.users.get(attachment.userId);
           if (!user) return;
 
-          // Token Bucket Rate Limiting (max 6 burst, 2 msgs/sec steady state)
-          let limiter = this.userLimiters.get(attachment.userId);
-          if (!limiter) {
-            limiter = new TokenBucketRateLimiter(6, 2);
-            this.userLimiters.set(attachment.userId, limiter);
-          }
-          if (!limiter.tryConsume(1)) {
+          // Token Bucket Rate Limiting (max 8 burst, 2 msgs/sec steady state)
+          if (!this.checkRateLimit(attachment.userId, 1)) {
             this.sendTo(ws, {
               type: "error",
               message: "You are sending messages too quickly. Please wait a moment.",
@@ -407,18 +444,31 @@ export class RoomDurableObject extends DurableObject {
             replyTo = undefined;
           }
           if (replyTo) {
+            let safeReplyGifUrl: string | undefined;
+            if (replyTo.gifUrl) {
+              try {
+                const parsed = new URL(replyTo.gifUrl);
+                if (parsed.protocol === "https:") safeReplyGifUrl = parsed.toString();
+              } catch {}
+            }
+
             replyTo = {
               id: String(replyTo.id).slice(0, 64),
               userId: String(replyTo.userId).slice(0, 64),
-              userName: String(replyTo.userName).slice(0, 16),
-              userColor: replyTo.userColor ? String(replyTo.userColor).slice(0, 32) : undefined,
+              userName: String(replyTo.userName).replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 16),
+              userColor: replyTo.userColor && /^#[0-9a-fA-F]{3,8}$/.test(replyTo.userColor) ? replyTo.userColor : undefined,
               text: replyTo.text ? String(replyTo.text).slice(0, 300) : undefined,
               imageBase64: replyTo.imageBase64 ? "attached" : undefined,
-              gifUrl: replyTo.gifUrl,
+              gifUrl: safeReplyGifUrl,
             };
           }
 
-          const messageId = data.id || crypto.randomUUID();
+          // Authoritative message ID (validate format and guarantee uniqueness)
+          const isValidClientTempId = typeof data.id === "string" && /^[a-zA-Z0-9_-]{1,64}$/.test(data.id);
+          const clientTempId = isValidClientTempId ? data.id : undefined;
+          const messageId = (clientTempId && !this.messages.some((m) => m.id === clientTempId))
+            ? clientTempId
+            : crypto.randomUUID();
           const message: Message = {
             id: messageId,
             roomId: this.roomId,
@@ -473,6 +523,14 @@ export class RoomDurableObject extends DurableObject {
           const attachment = ws.deserializeAttachment() as SocketAttachment | null;
           if (!attachment?.userId) return;
 
+          if (!this.checkRateLimit(attachment.userId, 1)) {
+            this.sendTo(ws, {
+              type: "error",
+              message: "You are editing messages too quickly. Please wait a moment.",
+            });
+            return;
+          }
+
           const messageIndex = this.messages.findIndex((m) => m.id === data.id);
           if (messageIndex === -1) return;
 
@@ -505,6 +563,14 @@ export class RoomDurableObject extends DurableObject {
           const attachment = ws.deserializeAttachment() as SocketAttachment | null;
           if (!attachment?.userId) return;
 
+          if (!this.checkRateLimit(attachment.userId, 1)) {
+            this.sendTo(ws, {
+              type: "error",
+              message: "You are deleting messages too quickly. Please wait a moment.",
+            });
+            return;
+          }
+
           const messageIndex = this.messages.findIndex((m) => m.id === data.id);
           if (messageIndex === -1) return;
 
@@ -528,6 +594,10 @@ export class RoomDurableObject extends DurableObject {
           const attachment = ws.deserializeAttachment() as SocketAttachment | null;
           if (!attachment?.userId) return;
 
+          if (!this.checkRateLimit(attachment.userId, 1)) {
+            return;
+          }
+
           let message = this.messages.find((m) => m.id === data.messageId);
           if (!message) {
             try {
@@ -540,7 +610,7 @@ export class RoomDurableObject extends DurableObject {
           }
           if (!message) return;
 
-          const emoji = data.emoji;
+          const emoji = typeof data.emoji === "string" ? data.emoji.trim() : "";
           if (!emoji || emoji.length > 10) return;
 
           if (!message.reactions) {
@@ -558,8 +628,14 @@ export class RoomDurableObject extends DurableObject {
               message.reactions[emoji] = userList;
             }
           } else {
-            userList.push(attachment.userId);
-            message.reactions[emoji] = userList;
+            // Cap distinct reaction emojis to 24 per message to prevent payload exhaustion
+            if (!message.reactions[emoji] && Object.keys(message.reactions).length >= 24) {
+              return;
+            }
+            if (userList.length < 100) {
+              userList.push(attachment.userId);
+              message.reactions[emoji] = userList;
+            }
           }
 
           try {
@@ -633,11 +709,46 @@ export class RoomDurableObject extends DurableObject {
           const attachment = ws.deserializeAttachment() as SocketAttachment | null;
           if (!attachment?.userId) return;
 
+          if (!this.checkRateLimit(attachment.userId, 1)) {
+            ws.send(JSON.stringify({ type: "rate_limited", retryAfter: 2000 }));
+            return;
+          }
+
           const user = this.users.get(attachment.userId);
           if (!user) return;
 
-          if (data.name && data.name.trim()) user.name = data.name.trim().slice(0, 16);
-          if (data.color) user.color = data.color;
+          if (data.name && typeof data.name === "string" && data.name.trim()) {
+            const nextName = data.name.trim().slice(0, 16);
+            const lowerNext = nextName.toLowerCase();
+            let conflictUser: User | null = null;
+            for (const [existingId, existingUser] of this.users.entries()) {
+              if (existingId === user.id) continue;
+              if (existingUser.name && existingUser.name.trim().toLowerCase() === lowerNext) {
+                if (this.isUserOnline(existingId)) {
+                  conflictUser = existingUser;
+                  break;
+                }
+              }
+            }
+
+            if (conflictUser) {
+              const randSuffix = Math.floor(10 + Math.random() * 90);
+              const basePrefix = nextName.slice(0, 13);
+              const suggested = `${basePrefix}-${randSuffix}`;
+              this.sendTo(ws, {
+                type: "name_taken",
+                name: nextName,
+                suggestedName: suggested,
+                message: `The name "${nextName}" is already taken by another active user in this room. Please choose a different name.`,
+              });
+              return;
+            }
+
+            user.name = nextName;
+          }
+          if (data.color && typeof data.color === "string" && /^#[0-9a-fA-F]{3,8}$/.test(data.color)) {
+            user.color = data.color;
+          }
 
           this.users.set(user.id, user);
 
@@ -776,14 +887,34 @@ export class RoomDurableObject extends DurableObject {
     });
   }
 
+  private isUserOnline(userId: string): boolean {
+    const sockets = this.userSockets.get(userId);
+    if (!sockets || sockets.size === 0) return false;
+
+    // Prune dead/closed sockets from Hibernation API
+    const activeSockets = new Set(this.ctx.getWebSockets());
+    for (const s of [...sockets]) {
+      if (!activeSockets.has(s) || s.readyState !== WebSocket.OPEN) {
+        sockets.delete(s);
+      }
+    }
+
+    if (sockets.size === 0) {
+      this.userSockets.delete(userId);
+      const user = this.users.get(userId);
+      if (user) user.isOnline = false;
+      return false;
+    }
+    return true;
+  }
+
   private getActiveUsersList(): User[] {
     const list: User[] = [];
     const seenNames = new Set<string>();
 
     // 1. Add all online users first
     for (const [userId, user] of this.users.entries()) {
-      const sockets = this.userSockets.get(userId);
-      const isOnline = Boolean(sockets && sockets.size > 0);
+      const isOnline = this.isUserOnline(userId);
       if (isOnline) {
         seenNames.add(user.name.toLowerCase());
         list.push({ ...user, isOnline: true });
@@ -792,8 +923,7 @@ export class RoomDurableObject extends DurableObject {
 
     // 2. Add offline users only if their name is not already online
     for (const [userId, user] of this.users.entries()) {
-      const sockets = this.userSockets.get(userId);
-      const isOnline = Boolean(sockets && sockets.size > 0);
+      const isOnline = this.isUserOnline(userId);
       if (!isOnline) {
         const lower = user.name.toLowerCase();
         if (!seenNames.has(lower)) {

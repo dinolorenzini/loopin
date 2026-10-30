@@ -10,7 +10,9 @@
     "dev": "wrangler dev",
     "build": "vite build",
     "deploy": "wrangler deploy",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --use-system-ca test/gif-and-qr-test.mjs",
+    "test:all": "node --use-system-ca test/gif-and-qr-test.mjs && node test/new-features-and-conflicts-test.mjs && node test/batch-features-test.mjs && node test/security-test.mjs && node test/ws-test.mjs"
   },
   "engines": {
     "node": ">=22.0.0"

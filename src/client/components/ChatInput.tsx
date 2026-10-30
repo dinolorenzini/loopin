@@ -122,6 +122,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       e.preventDefault();
       handleSend();
     } else if (e.key === "Escape") {
+      if (showEmojiPicker) {
+        e.preventDefault();
+        setShowEmojiPicker(false);
+        return;
+      }
+      if (showGifPicker) {
+        e.preventDefault();
+        setShowGifPicker(false);
+        return;
+      }
       if (replyingTo && onCancelReply) {
         e.preventDefault();
         onCancelReply();
@@ -172,6 +182,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
   }, []);
+
+  useEffect(() => {
+    if (!showEmojiPicker && !showGifPicker) return;
+    const handleGlobalEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowEmojiPicker(false);
+        setShowGifPicker(false);
+      }
+    };
+    window.addEventListener("keydown", handleGlobalEsc);
+    return () => window.removeEventListener("keydown", handleGlobalEsc);
+  }, [showEmojiPicker, showGifPicker]);
 
   return (
     <div className="chat-input-container">

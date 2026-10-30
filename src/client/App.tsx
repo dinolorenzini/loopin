@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { HomePage } from "./components/HomePage";
 import { RoomView } from "./components/RoomView";
-import { useUser } from "./hooks/useUser";
+import { useUser, isUserOnboarded } from "./hooks/useUser";
+import { OnboardingModal } from "./components/OnboardingModal";
 
 export const App: React.FC = () => {
   const { user, updateUser } = useUser();
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(() => !isUserOnboarded());
   const [currentRoom, setCurrentRoom] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     const path = window.location.pathname.replace(/^\/+|\/+$/g, "");
@@ -52,6 +54,13 @@ export const App: React.FC = () => {
           onUpdateUser={updateUser}
         />
       )}
+
+      <OnboardingModal
+        isOpen={isOnboardingOpen}
+        currentUser={user}
+        onSave={updateUser}
+        onComplete={() => setIsOnboardingOpen(false)}
+      />
     </div>
   );
 };

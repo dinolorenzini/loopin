@@ -10,7 +10,24 @@ interface Env {
   GIPHY_API_KEY?: string;
 }
 
-const gifRateLimiter = new IpRateLimiter(30, 2); // 30 burst, 2 requests/sec steady state
+const gifRateLimiter = new IpRateLimiter(45, 5); // 45 burst, 5 requests/sec steady state
+
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return true;
+  try {
+    const parsed = new URL(origin);
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "100.101.178.123" ||
+      host === "loopin.peretas.live" ||
+      host.endsWith(".loopin.peretas.live")
+    );
+  } catch {
+    return false;
+  }
+}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -18,19 +35,14 @@ export default {
 
     // Development & API CORS origin validation
     const origin = request.headers.get("Origin");
-    const isAllowedOrigin =
-      !origin ||
-      origin.includes("100.101.178.123") ||
-      origin.includes("localhost") ||
-      origin.includes("127.0.0.1") ||
-      origin.includes("loopin.peretas.live");
+    const allowed = isOriginAllowed(origin);
 
     // Handle OPTIONS preflight requests
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
         headers: {
-          "Access-Control-Allow-Origin": isAllowedOrigin && origin ? origin : "*",
+          "Access-Control-Allow-Origin": allowed && origin ? origin : "*",
           "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
           "Access-Control-Allow-Credentials": "true",
@@ -39,10 +51,13 @@ export default {
       });
     }
 
-    // 1. WebSocket endpoint: /api/room/:roomId/ws
+    // 1. WebSocket endpoint: /api/room/:roomId/ws (with Cross-Site WebSocket Hijacking check)
     if (url.pathname.startsWith("/api/room/")) {
       const parts = url.pathname.split("/").filter(Boolean); // ["api", "room", ":roomId", "ws"]
       if (parts.length >= 4 && parts[3] === "ws") {
+        if (!allowed) {
+          return new Response("Forbidden origin", { status: 403 });
+        }
         const rawRoomId = parts[2].toLowerCase();
         // Sanitize roomId (strictly alphanumeric, hyphens, underscores)
         const roomId = rawRoomId.replace(/[^a-z0-9_-]/g, "").slice(0, 64) || "general";
@@ -90,7 +105,7 @@ export default {
       return new Response(JSON.stringify(results), {
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=3600",
+          "Cache-Control": "public, max-age=300",
           "Access-Control-Allow-Origin": "*",
         },
       });
@@ -115,7 +130,7 @@ export default {
       headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
       headers.set(
         "Content-Security-Policy",
-        "default-src 'self' http://100.101.178.123:* ws://100.101.178.123:*; script-src 'self' 'unsafe-inline' http://100.101.178.123:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://media.giphy.com https://*.giphy.com http://100.101.178.123:*; connect-src 'self' http://100.101.178.123:* ws://100.101.178.123:* wss: ws: https:; object-src 'none'; base-uri 'self';"
+        "default-src 'self' http://100.101.178.123:* ws://100.101.178.123:*; script-src 'self' 'unsafe-inline' http://100.101.178.123:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://media.giphy.com https://*.giphy.com https://media.tenor.com https://*.tenor.com http://100.101.178.123:*; connect-src 'self' http://100.101.178.123:* ws://100.101.178.123:* wss: ws: https:; object-src 'none'; base-uri 'self';"
       );
 
       return new Response(assetResponse.body, {

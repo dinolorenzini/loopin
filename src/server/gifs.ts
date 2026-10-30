@@ -7,7 +7,10 @@ export interface GifItem {
   height: number;
 }
 
-// Curated high-resolution, instant-loading reaction GIFs
+// GIPHY API key configured for Loopin
+const DEFAULT_GIPHY_KEY = "vuZtWBSYD8Z1fILeLmVffAthzV4Fy9LO";
+
+// Curated high-resolution, instant-loading reaction GIFs (offline & fallback resilience)
 const CURATED_GIFS: Record<string, GifItem[]> = {
   trending: [
     {
@@ -53,8 +56,8 @@ const CURATED_GIFS: Record<string, GifItem[]> = {
     {
       id: "trend-6",
       title: "Leonardo Cheers",
-      previewUrl: "https://media.giphy.com/media/GCLlQnV7dXZ2E/giphy.gif",
-      url: "https://media.giphy.com/media/GCLlQnV7dXZ2E/giphy.gif",
+      previewUrl: "https://media1.giphy.com/media/yziuK6WtDFMly/100.gif",
+      url: "https://media1.giphy.com/media/yziuK6WtDFMly/giphy.gif",
       width: 480,
       height: 260,
     },
@@ -107,6 +110,14 @@ const CURATED_GIFS: Record<string, GifItem[]> = {
       url: "https://media.giphy.com/media/3oEjHAUOqG3lSS0f1C/giphy.gif",
       width: 480,
       height: 360,
+    },
+    {
+      id: "laugh-5",
+      title: "Rolling Laughing",
+      previewUrl: "https://media.giphy.com/media/ltIFdjNAasOwVvKhvx/giphy.gif",
+      url: "https://media.giphy.com/media/ltIFdjNAasOwVvKhvx/giphy.gif",
+      width: 480,
+      height: 270,
     },
   ],
   celebrate: [
@@ -229,24 +240,216 @@ const CURATED_GIFS: Record<string, GifItem[]> = {
       height: 360,
     },
   ],
+  dance: [
+    {
+      id: "dance-1",
+      title: "Happy Dance",
+      previewUrl: "https://media.giphy.com/media/blSTtZehjAZ8I/giphy.gif",
+      url: "https://media.giphy.com/media/blSTtZehjAZ8I/giphy.gif",
+      width: 480,
+      height: 360,
+    },
+    {
+      id: "dance-2",
+      title: "Carlton Dance",
+      previewUrl: "https://media.giphy.com/media/pa37AAG5KXoek/giphy.gif",
+      url: "https://media.giphy.com/media/pa37AAG5KXoek/giphy.gif",
+      width: 480,
+      height: 360,
+    },
+    {
+      id: "dance-3",
+      title: "Groovy Dance",
+      previewUrl: "https://media.giphy.com/media/ujTVMASREzuRbH6zy5/giphy.gif",
+      url: "https://media.giphy.com/media/ujTVMASREzuRbH6zy5/giphy.gif",
+      width: 480,
+      height: 480,
+    },
+    {
+      id: "dance-4",
+      title: "Vibing Dance",
+      previewUrl: "https://media.giphy.com/media/V7jkATiqn3mRie2LI2/giphy-downsized-medium.gif",
+      url: "https://media.giphy.com/media/V7jkATiqn3mRie2LI2/giphy-downsized-medium.gif",
+      width: 480,
+      height: 360,
+    },
+  ],
+  clap: [
+    {
+      id: "clap-1",
+      title: "Applause Clap",
+      previewUrl: "https://media.giphy.com/media/nbvFVPiEiJH6Q/giphy.gif",
+      url: "https://media.giphy.com/media/nbvFVPiEiJH6Q/giphy.gif",
+      width: 480,
+      height: 270,
+    },
+    {
+      id: "clap-2",
+      title: "Clap Applause",
+      previewUrl: "https://media4.giphy.com/media/Rgn6cUfaN5zW/100.gif",
+      url: "https://media4.giphy.com/media/Rgn6cUfaN5zW/giphy.gif",
+      width: 480,
+      height: 260,
+    },
+    {
+      id: "clap-3",
+      title: "Standing Ovation",
+      previewUrl: "https://media.giphy.com/media/l4q8cJzGdR9J8w3hS/giphy.gif",
+      url: "https://media.giphy.com/media/l4q8cJzGdR9J8w3hS/giphy.gif",
+      width: 480,
+      height: 270,
+    },
+    {
+      id: "clap-4",
+      title: "Enthusiastic Clapping",
+      previewUrl: "https://media.giphy.com/media/3o72FcJmLzIdYJdmDe/giphy.gif",
+      url: "https://media.giphy.com/media/3o72FcJmLzIdYJdmDe/giphy.gif",
+      width: 480,
+      height: 360,
+    },
+  ],
+  love: [
+    {
+      id: "love-1",
+      title: "Heart Eyes",
+      previewUrl: "https://media.giphy.com/media/R6gVNROjZaHjy/giphy.gif",
+      url: "https://media.giphy.com/media/R6gVNROjZaHjy/giphy.gif",
+      width: 480,
+      height: 360,
+    },
+    {
+      id: "love-2",
+      title: "Sending Love",
+      previewUrl: "https://media.giphy.com/media/26BRv0ThflsHCqDrG/giphy.gif",
+      url: "https://media.giphy.com/media/26BRv0ThflsHCqDrG/giphy.gif",
+      width: 480,
+      height: 270,
+    },
+    {
+      id: "love-3",
+      title: "Big Hug",
+      previewUrl: "https://media.giphy.com/media/l8ooTJxKGMkVW/giphy.gif",
+      url: "https://media.giphy.com/media/l8ooTJxKGMkVW/giphy.gif",
+      width: 480,
+      height: 360,
+    },
+  ],
+  sad: [
+    {
+      id: "sad-1",
+      title: "Crying Tears",
+      previewUrl: "https://media.giphy.com/media/26ufcVAp3AiJJsrIs/giphy.gif",
+      url: "https://media.giphy.com/media/26ufcVAp3AiJJsrIs/giphy.gif",
+      width: 480,
+      height: 360,
+    },
+    {
+      id: "sad-2",
+      title: "Sad SpongeBob",
+      previewUrl: "https://media.giphy.com/media/OPU6wzx8JrHna/giphy.gif",
+      url: "https://media.giphy.com/media/OPU6wzx8JrHna/giphy.gif",
+      width: 480,
+      height: 360,
+    },
+    {
+      id: "sad-3",
+      title: "Comfort Hug",
+      previewUrl: "https://media.giphy.com/media/EvYHHSntaIl5m/giphy.gif",
+      url: "https://media.giphy.com/media/EvYHHSntaIl5m/giphy.gif",
+      width: 480,
+      height: 270,
+    },
+  ],
 };
+
+function mapGiphyResponse(json: any, fallbackTitle: string): GifItem[] {
+  if (!json?.data || !Array.isArray(json.data)) return [];
+  return json.data
+    .map((item: any) => {
+      const previewUrl =
+        item.images?.fixed_height_small?.url ||
+        item.images?.downsized?.url ||
+        item.images?.fixed_height?.url ||
+        item.images?.original?.url;
+      const url =
+        item.images?.downsized_medium?.url ||
+        item.images?.downsized?.url ||
+        item.images?.original?.url ||
+        previewUrl;
+
+      if (!url || !previewUrl) return null;
+
+      return {
+        id: item.id || crypto.randomUUID(),
+        title: item.title?.trim() || fallbackTitle,
+        previewUrl,
+        url,
+        width: Number(item.images?.original?.width) || 480,
+        height: Number(item.images?.original?.height) || 360,
+      };
+    })
+    .filter((g: GifItem | null): g is GifItem => g !== null);
+}
 
 export async function searchGifs(query: string, apiKey?: string): Promise<GifItem[]> {
   const cleanQ = query.trim().toLowerCase();
+  const effectiveKey = apiKey || DEFAULT_GIPHY_KEY;
 
-  // If query is empty or "trending", return trending list
+  // 1. If empty or "trending", fetch GIPHY trending or fallback to curated trending
   if (!cleanQ || cleanQ === "trending") {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const resp = await fetch(
+        `https://api.giphy.com/v1/gifs/trending?api_key=${effectiveKey}&limit=16&rating=g`,
+        {
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        }
+      );
+      clearTimeout(timeoutId);
+      if (resp.ok) {
+        const json = await resp.json();
+        const items = mapGiphyResponse(json, "Trending");
+        if (items.length > 0) return items;
+      }
+    } catch {
+      // Fallback below
+    }
     return CURATED_GIFS.trending;
   }
 
-  // Check matching category
+  // 2. Query GIPHY live search API
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const resp = await fetch(
+      `https://api.giphy.com/v1/gifs/search?api_key=${effectiveKey}&q=${encodeURIComponent(cleanQ)}&limit=16&rating=g`,
+      {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      }
+    );
+    clearTimeout(timeoutId);
+    if (resp.ok) {
+      const json = await resp.json();
+      const items = mapGiphyResponse(json, cleanQ);
+      if (items.length > 0) {
+        return items;
+      }
+    }
+  } catch {
+    // Continue to curated fallback
+  }
+
+  // 3. Check matching category in curated library
   for (const [category, items] of Object.entries(CURATED_GIFS)) {
-    if (category.includes(cleanQ) || cleanQ.includes(category)) {
+    if (category === cleanQ || category.includes(cleanQ) || cleanQ.includes(category)) {
       return items;
     }
   }
 
-  // Filter curated library by title
+  // 4. Search curated library by title keywords
   const filtered = Object.values(CURATED_GIFS)
     .flat()
     .filter(
@@ -259,31 +462,7 @@ export async function searchGifs(query: string, apiKey?: string): Promise<GifIte
     return filtered;
   }
 
-  // If GIPHY / Tenor API key is available in environment:
-  if (apiKey) {
-    try {
-      const resp = await fetch(
-        `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(cleanQ)}&limit=16&rating=g`,
-        { headers: { "Accept": "application/json" } }
-      );
-      if (resp.ok) {
-        const json = await resp.json() as any;
-        if (json?.data && Array.isArray(json.data)) {
-          return json.data.map((item: any) => ({
-            id: item.id,
-            title: item.title || cleanQ,
-            previewUrl: item.images?.fixed_height_small?.url || item.images?.downsized?.url || item.images?.original?.url,
-            url: item.images?.downsized_medium?.url || item.images?.original?.url,
-            width: Number(item.images?.original?.width) || 480,
-            height: Number(item.images?.original?.height) || 360,
-          }));
-        }
-      }
-    } catch {
-      // Fallback to trending
-    }
-  }
-
-  // Return trending as friendly fallback
-  return CURATED_GIFS.trending;
+  // 5. If specific search term had 0 matches across GIPHY and curated library,
+  // return empty array so client can render "No GIFs found for 'query'" rather than confusing trending GIFs
+  return [];
 }

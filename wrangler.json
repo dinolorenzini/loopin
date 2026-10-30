@@ -4,6 +4,9 @@
   "main": "src/server/index.ts",
   "compatibility_date": "2025-02-01",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "GIPHY_API_KEY": "vuZtWBSYD8Z1fILeLmVffAthzV4Fy9LO"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

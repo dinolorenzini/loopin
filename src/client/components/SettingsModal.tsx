@@ -774,6 +774,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={profileName}
                       onChange={(e) => handleProfileNameChange(e.target.value)}
                       onBlur={handleApplyProfile}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleApplyProfile();
+                        }
+                      }}
                       maxLength={16}
                       placeholder="Enter name (max 16)..."
                       className={`clean-text-input ${profileError ? "has-error" : ""}`}

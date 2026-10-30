@@ -210,6 +210,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <div
               className={`msg-quoted-preview ${!isReplyAvailable ? "unavailable" : ""}`}
               onClick={() => isReplyAvailable && onScrollToMessage(message.replyTo!.id)}
+              onKeyDown={(e) => {
+                if (isReplyAvailable && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  onScrollToMessage(message.replyTo!.id);
+                }
+              }}
               role={isReplyAvailable ? "button" : undefined}
               tabIndex={isReplyAvailable ? 0 : undefined}
               title={

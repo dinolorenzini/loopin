@@ -6,6 +6,7 @@ import {
   Settings,
   Hash,
   AlertCircle,
+  Globe,
 } from "lucide-react";
 import type { User } from "../../server/types";
 import { ChatBackground } from "./ChatBackground";
@@ -281,6 +282,32 @@ export const HomePage: React.FC<HomePageProps> = ({
               <ArrowRight size={16} className="btn-arrow" />
             </button>
           </form>
+
+          {/* Global Chat Link */}
+          <div className="home-global-chat-wrap">
+            <button
+              type="button"
+              className="home-global-chat-card"
+              onClick={() => saveAndJoin("global")}
+              title="Join open ephemeral Global Chat (#global)"
+            >
+              <div className="home-global-chat-icon">
+                <Globe size={18} />
+              </div>
+              <div className="home-global-chat-info">
+                <div className="home-global-chat-title-row">
+                  <span className="home-global-chat-title">Global Chat</span>
+                  <span className="home-global-chat-pill">#global</span>
+                </div>
+                <span className="home-global-chat-subtitle">
+                  Public open room &bull; Disappears when empty
+                </span>
+              </div>
+              <span className="home-global-chat-action">
+                Join <ArrowRight size={14} />
+              </span>
+            </button>
+          </div>
 
           {/* Recent Rooms */}
           {recentRooms.length > 0 && (

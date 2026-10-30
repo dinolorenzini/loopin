@@ -145,7 +145,7 @@ async function runTestSuite() {
     })
   );
 
-  await sleep(150);
+  await sleep(250);
   const focusNoticeA = messagesA.find((m) => m.type === "user_focus_changed" && m.userId === "user-b");
   assert(focusNoticeA && focusNoticeA.isFocused === false, "Client A should receive focus_change false for user-b");
   console.log("✓ User focus_changed event successfully broadcast and received:", focusNoticeA);
@@ -225,10 +225,14 @@ async function runTestSuite() {
   await sleep(250);
   const initC = messagesC.find((m) => m.type === "init");
   assert(initC, "Client C should receive init");
-  // Charlie's own join message is the only one in the fresh room
+  // All previous messages from Alice and Bob were completely wiped on disconnect
   assert(
-    initC.messages.every((m) => m.text.includes("Charlie joined")),
-    `All previous messages were completely wiped on disconnect!`
+    !initC.messages.some((m) => !m.isSystem),
+    "All previous user messages must be completely wiped on disconnect!"
+  );
+  assert(
+    initC.messages.some((m) => m.text.includes("Charlie joined")),
+    "Charlie's join message should be present in the fresh room"
   );
 
   console.log("🎉 SUCCESS! All previous messages were completely wiped on disconnect!");

@@ -16,13 +16,24 @@ export const USER_COLORS = [
   "#e879f9", // Orchid Magenta
 ];
 
-function generateRandomName(): string {
+export function generateRandomName(): string {
   const adjectives = ["Swift", "Bright", "Neon", "Solar", "Cosmic", "Lunar", "Echo", "Hyper", "Vivid", "Nova"];
   const animals = ["Fox", "Wolf", "Otter", "Falcon", "Lynx", "Tiger", "Badger", "Owl", "Gecko", "Panda"];
   const num = Math.floor(10 + Math.random() * 90);
   const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
   const animal = animals[Math.floor(Math.random() * animals.length)];
   return `${adj}${animal}-${num}`;
+}
+
+export function isUserOnboarded(): boolean {
+  if (typeof window === "undefined") return true;
+  return localStorage.getItem("loopin_has_onboarded") === "true";
+}
+
+export function markUserOnboarded(): void {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("loopin_has_onboarded", "true");
+  }
 }
 
 export function useUser() {

@@ -15,6 +15,7 @@ import { UsersSidebar } from "./UsersSidebar";
 import { SettingsModal } from "./SettingsModal";
 import { ShareModal } from "./ShareModal";
 import { ImageLightbox } from "./ImageLightbox";
+import { NameConflictModal } from "./NameConflictModal";
 import { ChatBackground } from "./ChatBackground";
 import { processImageToBase64 } from "../utils/image";
 import type { User, Message } from "../../server/types";
@@ -63,6 +64,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
     users,
     status,
     typingUsers,
+    nameConflict,
+    resolveNameConflict,
     sendMessage,
     editMessage,
     deleteMessage,
@@ -423,6 +426,18 @@ export const RoomView: React.FC<RoomViewProps> = ({
       <ImageLightbox
         imageUrl={lightboxImage}
         onClose={() => setLightboxImage(null)}
+      />
+
+      <NameConflictModal
+        isOpen={Boolean(nameConflict)}
+        conflict={nameConflict}
+        roomId={roomId}
+        currentUser={currentUser}
+        onResolve={(newName, newColor) => {
+          onUpdateUser({ name: newName, ...(newColor ? { color: newColor } : {}) });
+          resolveNameConflict(newName);
+        }}
+        onLeave={onLeaveRoom}
       />
     </div>
   );

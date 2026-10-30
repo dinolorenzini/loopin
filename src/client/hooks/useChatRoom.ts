@@ -3,6 +3,12 @@ import type { ClientMessage, Message, ServerMessage, User, ReplyReference } from
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected";
 
+export interface NameConflictInfo {
+  name: string;
+  suggestedName: string;
+  message: string;
+}
+
 interface UseChatRoomOptions {
   roomId: string;
   currentUser: User;
@@ -14,9 +20,11 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
   const [users, setUsers] = useState<User[]>([]);
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [typingUsers, setTypingUsers] = useState<{ id: string; name: string }[]>([]);
+  const [nameConflict, setNameConflict] = useState<NameConflictInfo | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef<number>(0);
   const pingIntervalRef = useRef<number | null>(null);
   const isMountedRef = useRef<boolean>(true);
 
@@ -73,6 +81,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
     ws.onopen = () => {
       if (!isMountedRef.current) return;
+      reconnectAttemptsRef.current = 0;
       setStatus("connected");
 
       // Send join event with user profile
@@ -124,7 +133,17 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
           case "pong":
             break;
 
+          case "name_taken": {
+            setNameConflict({
+              name: data.name,
+              suggestedName: data.suggestedName || `${data.name}-${Math.floor(10 + Math.random() * 90)}`,
+              message: data.message,
+            });
+            break;
+          }
+
           case "init": {
+            setNameConflict(null);
             setMessages(data.messages || []);
             const userMap = new Map<string, User>();
             for (const u of data.users || []) {
@@ -272,11 +291,18 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
 
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      // Exponential backoff with jitter to prevent reconnect storms
+      const attempt = reconnectAttemptsRef.current;
+      const baseDelay = Math.min(8000, 1000 * Math.pow(1.5, attempt));
+      const jitter = Math.random() * 500;
+      const delay = Math.round(baseDelay + jitter);
+      reconnectAttemptsRef.current = attempt + 1;
+
       reconnectTimeoutRef.current = window.setTimeout(() => {
         if (isMountedRef.current) {
           connect();
         }
-      }, 1000);
+      }, delay);
     };
 
     ws.onerror = () => {
@@ -297,6 +323,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
     window.addEventListener("beforeunload", handleBeforeUnload);
 
     const handleOnline = () => {
+      reconnectAttemptsRef.current = 0;
       if (socketRef.current?.readyState !== WebSocket.OPEN) {
         connect();
       }
@@ -480,11 +507,33 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
     [sendPacket]
   );
 
+  const resolveNameConflict = useCallback(
+    (newName: string) => {
+      const clean = newName.trim().slice(0, 16);
+      if (!clean) return;
+      setNameConflict(null);
+      currentUserRef.current = { ...currentUserRef.current, name: clean };
+      sendPacket({
+        type: "join",
+        user: {
+          ...currentUserRef.current,
+          name: clean,
+          isFocused: typeof document !== "undefined" && !document.hidden && document.hasFocus(),
+          lastActiveAt: Date.now(),
+          isOnline: true,
+        },
+      });
+    },
+    [sendPacket]
+  );
+
   return {
     messages,
     users,
     status,
     typingUsers,
+    nameConflict,
+    resolveNameConflict,
     sendMessage,
     editMessage,
     deleteMessage,

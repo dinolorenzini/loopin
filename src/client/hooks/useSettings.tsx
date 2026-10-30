@@ -261,7 +261,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   messageStyle: "modern",
   chatWidth: "contained",
   noAnimations: false,
-  performanceMode: false,
+  performanceMode: true, // First launch automatically starts in performance mode
   soundMuted: false,
   notificationsEnabled: false,
   activeCategory: "appearance",
