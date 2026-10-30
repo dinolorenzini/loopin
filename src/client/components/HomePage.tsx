@@ -12,7 +12,7 @@ import type { User } from "../../server/types";
 import { ChatBackground } from "./ChatBackground";
 import { SettingsModal } from "./SettingsModal";
 import { LoopinLogo } from "./LoopinLogo";
-import { SettingsHintPopover, dismissSettingsHintLocally } from "./SettingsHintPopover";
+import { SettingsHintPopover } from "./SettingsHintPopover";
 import { LegalModal, type LegalDocType } from "./LegalModal";
 
 interface HomePageProps {
@@ -210,7 +210,6 @@ export const HomePage: React.FC<HomePageProps> = ({
             type="button"
             className="header-icon-btn"
             onClick={() => {
-              dismissSettingsHintLocally();
               setSettingsCategory("appearance");
               setIsSettingsOpen(true);
             }}
@@ -229,181 +228,182 @@ export const HomePage: React.FC<HomePageProps> = ({
       </header>
 
       <main className="home-content">
-        {/* Brand Hero (Logo centered with quiet tagline) */}
-        <div className="home-hero">
-          <div className="home-logo-wrap">
-            <LoopinLogo size={56} className="home-logo-bare" />
-          </div>
-          <h1 className="home-title">
-            Loop<span className="text-accent">in</span>
-          </h1>
-          <p className="home-tagline">
-            Simple, fast, private ephemeral chats.
-          </p>
-        </div>
-
-        {/* Action Card */}
-        <div className="home-card">
-          {/* User profile bar */}
-          <div
-            className="home-profile-bar"
-            onClick={() => {
-              setSettingsCategory("profile");
-              setIsSettingsOpen(true);
-            }}
-            role="button"
-            tabIndex={0}
-            title="Edit your display name & color"
-          >
-            <span
-              className="user-color-dot"
-              style={{ backgroundColor: currentUser.color || "var(--primary-accent)" }}
-            />
-            <div className="home-user-details">
-              <span className="home-user-label">Chatting as</span>
-              <span className="home-user-name" style={{ color: currentUser.color || "inherit" }}>
-                {currentUser.name}
-              </span>
-            </div>
-            <span className="home-user-edit-link">Edit</span>
-          </div>
-
-          {/* Unified Action Form */}
-          <form onSubmit={handleSubmit} className="join-chat-box">
-            <div className="join-box-label-row">
-              <label htmlFor="home-room-input" className="join-box-label">
-                Room code or link
-              </label>
-              <span className="join-box-label-hint">optional</span>
+        <div className="home-card-wide">
+          {/* Left Column: Branding and Legal */}
+          <div className="home-card-left">
+            <div className="home-card-left-header">
+              <div className="home-card-logo-wrap">
+                <LoopinLogo size={52} className="home-logo-card" />
+              </div>
+              <h1 className="home-card-title">
+                Loop<span className="text-accent">in</span>
+              </h1>
+              <p className="home-card-tagline">
+                Simple, fast, private ephemeral chats.
+              </p>
             </div>
 
-            <div className="room-input-wrap">
-              <span className="room-input-prefix">
-                <Hash size={15} />
-              </span>
-              <input
-                id="home-room-input"
-                name="room_search_code"
-                type="search"
-                value={roomInput}
-                onChange={(e) => {
-                  setRoomInput(e.target.value);
-                  if (inputError) setInputError(null);
+            <div className="home-card-left-footer">
+              <span>By continuing, you agree to our </span>
+              <button
+                type="button"
+                className="home-legal-link"
+                onClick={() => {
+                  setLegalDoc("tos");
+                  setIsLegalOpen(true);
                 }}
-                maxLength={64}
-                placeholder="e.g. swift-fox-42"
-                className={`text-input home-room-input ${inputError ? "input-has-error" : ""}`}
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                data-1p-ignore="true"
-                data-lpignore="true"
-                data-form-type="other"
-                autoFocus
+              >
+                Terms of Service
+              </button>
+              <span> and </span>
+              <button
+                type="button"
+                className="home-legal-link"
+                onClick={() => {
+                  setLegalDoc("privacy");
+                  setIsLegalOpen(true);
+                }}
+              >
+                Privacy Policy
+              </button>
+              <span>.</span>
+            </div>
+          </div>
+
+          {/* Right Column: User identity & Join Controls */}
+          <div className="home-card-right">
+            {/* User profile bar */}
+            <div
+              className="home-profile-bar"
+              onClick={() => {
+                setSettingsCategory("profile");
+                setIsSettingsOpen(true);
+              }}
+              role="button"
+              tabIndex={0}
+              title="Edit your display name & color"
+            >
+              <span
+                className="user-color-dot"
+                style={{ backgroundColor: currentUser.color || "var(--primary-accent)" }}
               />
+              <div className="home-user-details">
+                <span className="home-user-label">Chatting as</span>
+                <span className="home-user-name" style={{ color: currentUser.color || "inherit" }}>
+                  {currentUser.name}
+                </span>
+              </div>
+              <span className="home-user-edit-link">Edit</span>
             </div>
 
-            {inputError && (
-              <div className="home-inline-error" role="alert">
-                <AlertCircle size={14} className="error-icon" />
-                <span>{inputError}</span>
+            {/* Unified Action Form */}
+            <form onSubmit={handleSubmit} className="join-chat-box">
+              <div className="join-box-label-row">
+                <label htmlFor="home-room-input" className="join-box-label">
+                  Room code or link
+                </label>
+                <span className="join-box-label-hint">optional</span>
+              </div>
+
+              <div className="room-input-wrap">
+                <span className="room-input-prefix">
+                  <Hash size={15} />
+                </span>
+                <input
+                  id="home-room-input"
+                  name="room_search_code"
+                  type="search"
+                  value={roomInput}
+                  onChange={(e) => {
+                    setRoomInput(e.target.value);
+                    if (inputError) setInputError(null);
+                  }}
+                  maxLength={64}
+                  placeholder="e.g. swift-fox-42"
+                  className={`home-room-input ${inputError ? "input-has-error" : ""}`}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  data-form-type="other"
+                  autoFocus
+                />
+              </div>
+
+              {inputError && (
+                <div className="home-inline-error" role="alert">
+                  <AlertCircle size={14} className="error-icon" />
+                  <span>{inputError}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="btn btn-primary full-width-btn submit-action-btn"
+              >
+                <span>{hasEnteredCode ? "Join chat" : "Create new lobby"}</span>
+                <ArrowRight size={16} className="btn-arrow" />
+              </button>
+            </form>
+
+            <div className="home-card-divider">
+              <span>or join</span>
+            </div>
+
+            {/* Global Chat Link */}
+            <div className="home-global-chat-wrap">
+              <button
+                type="button"
+                className="home-global-chat-card"
+                onClick={() => saveAndJoin("global")}
+                title="Join open ephemeral Global Chat"
+              >
+                <div className="home-global-chat-icon">
+                  <Globe size={18} />
+                </div>
+                <div className="home-global-chat-info">
+                  <span className="home-global-chat-title">Global Chat</span>
+                </div>
+                <span className="home-global-chat-action">
+                  Join <ArrowRight size={14} />
+                </span>
+              </button>
+            </div>
+
+            {/* Recent Rooms */}
+            {recentRooms.length > 0 && (
+              <div className="recent-rooms-section">
+                <div className="recent-rooms-header">
+                  <span className="recent-title">
+                    <Clock size={12} /> Recent Rooms
+                  </span>
+                  <button
+                    type="button"
+                    className="clear-recents-btn"
+                    onClick={clearRecents}
+                    title="Clear history"
+                  >
+                    <Trash2 size={12} /> Clear
+                  </button>
+                </div>
+                <div className="recent-rooms-list">
+                  {recentRooms.map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      className="recent-room-pill"
+                      onClick={() => saveAndJoin(r.id)}
+                    >
+                      <span className="recent-room-hash">#</span>
+                      <span className="recent-room-id">{r.id}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
-
-            <button
-              type="submit"
-              className="btn btn-primary full-width-btn submit-action-btn"
-            >
-              <span>{hasEnteredCode ? "Join chat" : "Create new lobby"}</span>
-              <ArrowRight size={16} className="btn-arrow" />
-            </button>
-          </form>
-
-          {/* Global Chat Link */}
-          <div className="home-global-chat-wrap">
-            <button
-              type="button"
-              className="home-global-chat-card"
-              onClick={() => saveAndJoin("global")}
-              title="Join open ephemeral Global Chat (#global)"
-            >
-              <div className="home-global-chat-icon">
-                <Globe size={18} />
-              </div>
-              <div className="home-global-chat-info">
-                <div className="home-global-chat-title-row">
-                  <span className="home-global-chat-title">Global Chat</span>
-                  <span className="home-global-chat-pill">#global</span>
-                </div>
-                <span className="home-global-chat-subtitle">
-                  Public open room &bull; Disappears when empty
-                </span>
-              </div>
-              <span className="home-global-chat-action">
-                Join <ArrowRight size={14} />
-              </span>
-            </button>
           </div>
-
-          {/* Legal Disclaimer */}
-          <div className="home-legal-disclaimer">
-            By joining a chat, you agree to our{" "}
-            <button
-              type="button"
-              className="home-legal-link"
-              onClick={() => {
-                setLegalDoc("tos");
-                setIsLegalOpen(true);
-              }}
-            >
-              Terms of Service
-            </button>{" "}
-            and{" "}
-            <button
-              type="button"
-              className="home-legal-link"
-              onClick={() => {
-                setLegalDoc("privacy");
-                setIsLegalOpen(true);
-              }}
-            >
-              Privacy Policy
-            </button>
-            .
-          </div>
-
-          {/* Recent Rooms */}
-          {recentRooms.length > 0 && (
-            <div className="recent-rooms-section">
-              <div className="recent-rooms-header">
-                <span className="recent-title">
-                  <Clock size={12} /> Recent Rooms
-                </span>
-                <button
-                  type="button"
-                  className="clear-recents-btn"
-                  onClick={clearRecents}
-                  title="Clear history"
-                >
-                  <Trash2 size={12} /> Clear
-                </button>
-              </div>
-              <div className="recent-rooms-list">
-                {recentRooms.map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    className="recent-room-pill"
-                    onClick={() => saveAndJoin(r.id)}
-                  >
-                    <span className="recent-room-hash">#</span>
-                    <span className="recent-room-id">{r.id}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </main>
 

@@ -285,11 +285,11 @@ export class RoomDurableObject extends DurableObject {
 
           const activeUsers = this.getActiveUsersList();
 
-          // Send initialization data to the newly joined client
+          // Send initialization data to the newly joined client (excluding own join announcement)
           this.sendTo(ws, {
             type: "init",
             roomId: this.roomId,
-            messages: this.messages,
+            messages: joinMsg ? this.messages.filter((m) => m.id !== joinMsg.id) : this.messages,
             users: activeUsers,
             selfId: user.id,
           });

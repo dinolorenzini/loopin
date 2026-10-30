@@ -14,7 +14,6 @@ import {
   Check,
   Plus,
   Maximize2,
-  Lock,
   FileText,
   Trash2,
   Eye,
@@ -1097,33 +1096,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* 7. PRIVACY & DATA */}
             {activeTab === "privacy" && (
               <div className="settings-category-view">
-                {/* 1. Architecture Card */}
-                <div className="privacy-feature-card">
-                  <div className="privacy-feature-badge">
-                    <Shield size={20} className="text-accent" />
-                  </div>
-                  <div className="privacy-feature-text">
-                    <h4 className="privacy-card-title">RAM-Only Ephemeral Architecture</h4>
-                    <p className="privacy-card-desc">
-                      Messages live strictly in temporary volatile memory (RAM) within Cloudflare Workers &amp; Durable Objects. When everyone leaves a room or the room goes inactive, all messages evaporate permanently.
-                    </p>
-                  </div>
-                </div>
-
-                {/* 2. Zero Tracking Card */}
-                <div className="privacy-feature-card">
-                  <div className="privacy-feature-badge">
-                    <Lock size={20} className="text-accent" />
-                  </div>
-                  <div className="privacy-feature-text">
-                    <h4 className="privacy-card-title">Zero Tracking &amp; No Accounts</h4>
-                    <p className="privacy-card-desc">
-                      Loopin does not use tracking cookies, analytics pixels, or user profiling. No email or phone number is ever requested.
-                    </p>
-                  </div>
-                </div>
-
-                {/* 3. Legal Documents */}
+                {/* Legal Documents */}
                 <div className="pane-section">
                   <h3 className="section-title">Legal &amp; Compliance</h3>
                   <p className="section-desc">Review our transparent ephemeral chat policies and acceptable use agreements.</p>

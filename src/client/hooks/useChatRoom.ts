@@ -144,7 +144,10 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
           case "init": {
             setNameConflict(null);
-            setMessages(data.messages || []);
+            const initialMsgs = (data.messages || []).filter(
+              (m: Message) => !(m.isSystem && m.text === `${currentUser.name} joined the room`)
+            );
+            setMessages(initialMsgs);
             const userMap = new Map<string, User>();
             for (const u of data.users || []) {
               if (u && u.id) userMap.set(u.id, u);

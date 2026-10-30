@@ -75,12 +75,13 @@ export const THEME_PRESETS = [
 ];
 
 export const BG_BASE_COLORS = [
-  { name: "Deep Pitch", color: "#09090b" },
-  { name: "Midnight Navy", color: "#0b1120" },
-  { name: "Slate Abyss", color: "#0f172a" },
-  { name: "Dark Violet", color: "#13091f" },
-  { name: "Emerald Shadow", color: "#061a14" },
-  { name: "Crimson Eclipse", color: "#1a0808" },
+  { name: "Obsidian Pitch", color: "#09090b" },
+  { name: "Charcoal Zinc", color: "#121215" },
+  { name: "Midnight Space", color: "#0c1017" },
+  { name: "Slate Noir", color: "#0f172a" },
+  { name: "Twilight Violet", color: "#140e1e" },
+  { name: "Cyber Pine", color: "#0a1512" },
+  { name: "Velvet Eclipse", color: "#180b0e" },
 ];
 
 export interface BackgroundMeta {
@@ -311,7 +312,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   themeColor: "#facc15",
   themeMode: "dark",
   backgroundColor: "#09090b",
-  background: "starfield",
+  background: "minimal-dark",
   bgCustom: DEFAULT_BG_CONFIG,
   messageStyle: "modern",
   chatWidth: "contained",
@@ -514,8 +515,43 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       localStorage.clear();
       sessionStorage.clear();
+
+      // Explicitly purge all known keys to ensure full wipe regardless of storage engine
+      const keysToPurge = [
+        "loopin_settings_hint_dismissed",
+        "loopin_has_onboarded",
+        "loopin_recent_rooms",
+        "loopin_user_name",
+        "loopin_user_color",
+        "loopin_tab_user_id",
+        "loopin_settings_v4",
+        "loopin_settings_v3",
+        "loopin_settings_v2",
+        "loopin_settings",
+      ];
+      for (const k of keysToPurge) {
+        try {
+          localStorage.removeItem(k);
+          sessionStorage.removeItem(k);
+        } catch {}
+      }
+
+      // Expire all cookies
+      if (typeof document !== "undefined") {
+        const cookies = document.cookie.split(";");
+        for (const cookie of cookies) {
+          const eqPos = cookie.indexOf("=");
+          const name = eqPos > -1 ? cookie.substring(0, eqPos) : cookie;
+          document.cookie = `${name.trim()}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+        }
+      }
+
+      // Full reload from root
+      window.location.replace("/");
+      window.location.reload();
+    } catch {
       window.location.href = "/";
-    } catch {}
+    }
   }, []);
 
   return (

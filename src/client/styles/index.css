@@ -1431,15 +1431,48 @@ dialog::backdrop {
   color: var(--text-secondary);
 }
 .md-preview-code {
-  font-family: var(--font-mono);
+  font-family: inherit;
   color: #f472b6;
   background: rgba(255, 255, 255, 0.08);
   border-radius: 3px;
-  padding: 1px 2px;
+  padding: 0;
+  margin: 0;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.06);
 }
 .md-preview-header {
   font-weight: 700;
   color: var(--text-primary);
+}
+.md-preview-header.md-preview-h1 {
+  font-size: 1.25em;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.md-preview-header.md-preview-h2 {
+  font-size: 1.15em;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.md-preview-header.md-preview-h3 {
+  font-size: 1.05em;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.chat-input-editor-wrapper.has-heading-1 .chat-input-textarea,
+.chat-input-editor-wrapper.has-heading-1 .chat-input-markdown-underlay {
+  font-size: 18px;
+  line-height: 26px;
+}
+.chat-input-editor-wrapper.has-heading-2 .chat-input-textarea,
+.chat-input-editor-wrapper.has-heading-2 .chat-input-markdown-underlay {
+  font-size: 16px;
+  line-height: 24px;
+}
+.chat-input-editor-wrapper.has-heading-3 .chat-input-textarea,
+.chat-input-editor-wrapper.has-heading-3 .chat-input-markdown-underlay {
+  font-size: 15px;
+  line-height: 23px;
 }
 .md-preview-quote {
   font-style: italic;
@@ -2435,8 +2468,8 @@ dialog::backdrop {
 }
 
 .home-brand-badge:hover {
-  background: var(--surface-hover);
-  border-color: var(--border-hover);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .home-brand-badge-logo {
@@ -2559,6 +2592,122 @@ dialog::backdrop {
   gap: var(--space-4);
 }
 
+/* Revamped Centered Two-Column Wide Card Layout */
+.home-card-wide {
+  width: 100%;
+  max-width: 880px;
+  min-height: 490px;
+  background: rgba(24, 24, 27, 0.78);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  overflow: hidden;
+  position: relative;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.home-card-left {
+  padding: var(--space-6);
+  background: rgba(18, 18, 20, 0.65);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.home-card-left-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.home-card-logo-wrap {
+  margin-bottom: var(--space-4);
+}
+
+.home-logo-card {
+  display: block;
+}
+
+.home-card-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.home-card-tagline {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.home-card-left-footer {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding-top: var(--space-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.home-card-right {
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: transparent;
+  min-height: 100%;
+}
+
+.home-card-right .home-global-chat-wrap {
+  margin-top: 0;
+}
+
+.home-card-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 0;
+}
+
+.home-card-divider::before,
+.home-card-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.home-card-divider span {
+  padding: 0 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .home-card-wide {
+    grid-template-columns: 1fr;
+    max-width: 440px;
+  }
+  .home-card-left {
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    padding: var(--space-5);
+  }
+  .home-card-right {
+    padding: var(--space-5);
+  }
+}
+
 .home-profile-bar {
   display: flex;
   align-items: center;
@@ -2639,10 +2788,11 @@ dialog::backdrop {
 }
 .home-room-input {
   flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  padding: 0;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
   font-size: 13.5px;
   color: var(--text-primary);
   height: 100%;
@@ -2698,6 +2848,7 @@ button:disabled {
   gap: 8px;
   border-top: 1px solid var(--border-color);
   padding-top: var(--space-3);
+  margin-top: auto;
 }
 .recent-rooms-header {
   display: flex;
@@ -2726,6 +2877,8 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  max-height: 60px;
+  overflow-y: auto;
 }
 .recent-room-pill {
   display: flex;
@@ -3589,7 +3742,7 @@ button:disabled {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(250, 204, 21, 0.12);
+  background: color-mix(in srgb, var(--primary-accent) 12%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3673,7 +3826,7 @@ button:disabled {
   width: 38px;
   height: 38px;
   border-radius: var(--radius-sm);
-  background: rgba(250, 204, 21, 0.12);
+  background: color-mix(in srgb, var(--primary-accent) 12%, transparent);
   color: var(--primary-accent);
   display: flex;
   align-items: center;
@@ -4140,7 +4293,7 @@ button:disabled {
   width: 20px;
   height: 20px;
   border-radius: var(--radius-sm);
-  background: rgba(250, 204, 21, 0.12);
+  background: color-mix(in srgb, var(--primary-accent) 12%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4251,7 +4404,7 @@ button:disabled {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-sm);
-  background: rgba(250, 204, 21, 0.12);
+  background: color-mix(in srgb, var(--primary-accent) 12%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4475,7 +4628,7 @@ button:disabled {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-sm);
-  background: rgba(250, 204, 21, 0.12);
+  background: color-mix(in srgb, var(--primary-accent) 12%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;

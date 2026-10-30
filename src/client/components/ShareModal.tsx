@@ -20,9 +20,11 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, roomId 
       if (dialogRef.current && !dialogRef.current.open) {
         dialogRef.current.showModal();
       }
-      setTimeout(() => {
+      renderQrCode(roomUrl, canvasRef.current);
+      const timer = setTimeout(() => {
         renderQrCode(roomUrl, canvasRef.current);
       }, 50);
+      return () => clearTimeout(timer);
     } else {
       if (dialogRef.current && dialogRef.current.open) {
         dialogRef.current.close();

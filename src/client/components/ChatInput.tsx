@@ -145,9 +145,10 @@ function renderInlineMarkdownPreview(rawText: string): React.ReactNode {
     const headerMatch = line.match(/^(#{1,6}\s+)(.*)$/);
     if (headerMatch) {
       const [, hashPrefix, content] = headerMatch;
+      const level = Math.min(hashPrefix.trim().length, 3);
       return (
         <React.Fragment key={lineIdx}>
-          <span className="md-preview-header">
+          <span className={`md-preview-header md-preview-h${level}`}>
             <span className="md-preview-marker">{hashPrefix}</span>
             {renderInlineSpans(content, `h-${lineIdx}`)}
           </span>
@@ -232,6 +233,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   // Check if current text contains any markdown tokens
   const hasMarkdown = useMemo(() => {
     return /([*_`~#>[\]]|```)/.test(text);
+  }, [text]);
+
+  const headingLevel = useMemo(() => {
+    const match = text.match(/^(#{1,3})\s+/);
+    return match ? match[1].length : 0;
   }, [text]);
 
   const renderedPreviewTokens = useMemo(() => {
@@ -593,7 +599,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
 
         {/* In-box live markdown editor: transparent textarea overlaid on formatted preview underlay */}
-        <div className="chat-input-editor-wrapper">
+        <div className={`chat-input-editor-wrapper ${headingLevel > 0 ? `has-heading has-heading-${headingLevel}` : ""}`}>
           <div
             ref={previewUnderlayRef}
             className={`chat-input-markdown-underlay ${hasMarkdown ? "visible" : ""}`}
@@ -613,7 +619,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 ? "Edit your message... (Enter to save, Esc to cancel)"
                 : replyingTo
                 ? `Replying to ${replyingTo.userName}...`
-                : "Send a message... (Markdown supported)"
+                : "Send a message..."
             }
             className={`chat-input-textarea ${hasMarkdown ? "has-markdown" : ""}`}
             rows={1}

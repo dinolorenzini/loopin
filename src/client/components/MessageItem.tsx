@@ -247,34 +247,24 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             </div>
           )}
 
-          {/* Meta footer inside bubble: timestamp & edit badges */}
-          <div className="msg-meta-row">
-            {message.editedAt && (
-              <span
-                className="msg-edited-badge"
-                title={`Edited at ${new Date(message.editedAt).toLocaleTimeString()}`}
-              >
-                (edited)
-              </span>
-            )}
-            {isBeingEdited && (
-              <span className="msg-editing-pill" title="Currently editing this message in the input bar">
-                editing...
-              </span>
-            )}
-            <span className="msg-time">{timeFormatted}</span>
-            {isMe && (
-              <span className="msg-status-icon">
-                {showSeen ? (
-                  <CheckCheck size={12} className="text-accent" />
-                ) : showDelivered ? (
-                  <CheckCheck size={12} className="text-muted" />
-                ) : (
-                  <Check size={12} className="text-muted" />
-                )}
-              </span>
-            )}
-          </div>
+          {/* Meta footer inside bubble: edit badges only */}
+          {(message.editedAt || isBeingEdited) && (
+            <div className="msg-meta-row">
+              {message.editedAt && (
+                <span
+                  className="msg-edited-badge"
+                  title={`Edited at ${new Date(message.editedAt).toLocaleTimeString()}`}
+                >
+                  (edited)
+                </span>
+              )}
+              {isBeingEdited && (
+                <span className="msg-editing-pill" title="Currently editing this message in the input bar">
+                  editing...
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Action Toolbar on hover */}
           <div className="msg-hover-toolbar">

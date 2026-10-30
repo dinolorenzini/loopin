@@ -128,7 +128,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       resizeObserver.observe(canvas.parentElement);
     }
 
-    const speed = Math.max(0.1, config.speed || 1.0);
+    const speed = Math.max(0.1, (config.speed || 1.0) * (thumbnail ? 0.35 : 1.0));
 
     // Helper to paint base background
     const clearBackground = () => {
@@ -154,7 +154,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       ctx.fillRect(0, 0, width, height);
     }
 
-    // ── 1. Animated Blueprint Grid (Subtle, refined dark blueprint) ──
+    // ── 1. Animated Blueprint Grid (Uses user's chosen accent color) ──
     else if (type === "blueprint-grid") {
       let scanY = 0;
       const gridSize = thumbnail ? 16 : 28;
@@ -167,9 +167,9 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
         clearBackground();
 
-        // Subtle coordinate grid
+        // Subtle coordinate grid with accent color
         ctx.lineWidth = 0.8;
-        ctx.strokeStyle = "rgba(56, 189, 248, 0.08)";
+        ctx.strokeStyle = hexOrRgbToRgba(accentColor, 0.09);
 
         for (let x = 0; x <= width; x += gridSize) {
           ctx.beginPath();
@@ -187,7 +187,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
         // Major grid lines & crosshairs
         const majorSize = gridSize * 4;
-        ctx.strokeStyle = "rgba(56, 189, 248, 0.16)";
+        ctx.strokeStyle = hexOrRgbToRgba(accentColor, 0.18);
         ctx.lineWidth = 1;
         for (let x = 0; x <= width; x += majorSize) {
           ctx.beginPath();
@@ -202,17 +202,17 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
           ctx.stroke();
         }
 
-        // Animated scanning beam
+        // Animated scanning beam with accent color
         if (shouldAnimate) {
           scanY = (scanY + 1.2 * speed) % (height + 40);
         }
         const grad = ctx.createLinearGradient(0, scanY - 30, 0, scanY);
-        grad.addColorStop(0, "rgba(56, 189, 248, 0)");
-        grad.addColorStop(1, "rgba(56, 189, 248, 0.14)");
+        grad.addColorStop(0, hexOrRgbToRgba(accentColor, 0));
+        grad.addColorStop(1, hexOrRgbToRgba(accentColor, 0.15));
         ctx.fillStyle = grad;
         ctx.fillRect(0, scanY - 30, width, 30);
 
-        ctx.strokeStyle = "rgba(56, 189, 248, 0.4)";
+        ctx.strokeStyle = hexOrRgbToRgba(accentColor, 0.45);
         ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.moveTo(0, scanY);
@@ -425,12 +425,12 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       render();
     }
 
-    // ── 4. Neon Waves (Harmonic Silk Mathematical Waves) ──
-    else if (type === "waves" || type === "aurora") {
+    // ── 4. Neon Waves (Harmonic Glowing Sine Waves) ──
+    else if (type === "waves") {
       let t = 0;
       const ribbons = Math.min(8, Math.max(2, config.ribbonCount || 5));
-      const amp = config.waveAmp || 42;
-      const freq = config.waveFreq || 0.003;
+      const amp = config.waveAmp || 38;
+      const freq = config.waveFreq || 0.0035;
       const vOffset = (config.verticalOffset || 0) / 100;
 
       const render = () => {
@@ -442,41 +442,126 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
         clearBackground();
 
         if (shouldAnimate) {
-          t += 0.015 * speed;
+          t += 0.02 * speed;
         }
 
         const baselineY = height * (0.5 - vOffset * 0.4);
 
         for (let i = 0; i < ribbons; i++) {
           const frac = (i + 1) / (ribbons + 1);
-          const phase = i * 0.8;
-          const currentAmp = amp * (0.8 + frac * 0.6) * (thumbnail ? 0.6 : 1.0);
+          const phase = i * 0.9;
+          const currentAmp = amp * (0.7 + frac * 0.7) * (thumbnail ? 0.6 : 1.0);
 
           ctx.beginPath();
-          ctx.moveTo(0, height);
-
-          const step = thumbnail ? 12 : 6;
+          const step = thumbnail ? 8 : 4;
           for (let x = 0; x <= width + step; x += step) {
             const y1 = Math.sin(x * freq + t + phase) * currentAmp;
-            const y2 = Math.cos(x * freq * 0.7 - t * 0.8 + phase * 1.2) * (currentAmp * 0.5);
-            const y = baselineY + y1 + y2 + (i - ribbons / 2) * (thumbnail ? 10 : 24);
-            ctx.lineTo(x, y);
+            const y2 = Math.cos(x * freq * 1.6 - t * 1.2 + phase * 1.5) * (currentAmp * 0.4);
+            const y3 = Math.sin(x * freq * 0.5 + t * 0.7) * (currentAmp * 0.3);
+            const y = baselineY + y1 + y2 + y3 + (i - ribbons / 2) * (thumbnail ? 8 : 18);
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
           }
 
+          ctx.lineWidth = thumbnail ? 1.2 : 2.0;
+          ctx.strokeStyle = i % 2 === 0 ? hexOrRgbToRgba(accentColor, 0.75 + frac * 0.25) : "rgba(255, 255, 255, 0.7)";
+          ctx.stroke();
+
+          // Ambient glow beneath wave
           ctx.lineTo(width, height);
+          ctx.lineTo(0, height);
+          ctx.closePath();
+          const grad = ctx.createLinearGradient(0, baselineY - currentAmp, 0, height);
+          grad.addColorStop(0, hexOrRgbToRgba(accentColor, 0.08 + frac * 0.08));
+          grad.addColorStop(1, "rgba(9, 9, 11, 0.02)");
+          ctx.fillStyle = grad;
+          ctx.fill();
+        }
+
+        if (shouldAnimate) {
+          animationFrameId = requestAnimationFrame(render);
+        }
+      };
+      render();
+    }
+
+    // ── 4B. Aurora Silk (Ethereal Polar Curtains with Vertical Light Rays) ──
+    else if (type === "aurora") {
+      let t = 0;
+      const vOffset = (config.verticalOffset || 0) / 100;
+      const rays = thumbnail ? 14 : 32;
+
+      const render = () => {
+        if (!thumbnail && !isTabVisible) {
+          animationFrameId = requestAnimationFrame(render);
+          return;
+        }
+
+        clearBackground();
+
+        if (shouldAnimate) {
+          t += 0.012 * speed;
+        }
+
+        const horizonY = height * (0.8 - vOffset * 0.3);
+        const curtainHeight = height * (thumbnail ? 0.7 : 0.85);
+
+        // Billowing soft sheer curtain folds
+        for (let fold = 0; fold < 3; fold++) {
+          const foldPhase = fold * 1.4;
+          const foldSpeed = t * (0.7 + fold * 0.3);
+
+          ctx.beginPath();
+          ctx.moveTo(0, horizonY);
+
+          const step = width / (rays - 1);
+          for (let i = 0; i < rays; i++) {
+            const x = i * step;
+            const wave = Math.sin(i * 0.3 + foldSpeed + foldPhase) * (thumbnail ? 12 : 36) +
+                         Math.cos(i * 0.15 - foldSpeed * 0.8) * (thumbnail ? 8 : 22);
+            const topY = horizonY - curtainHeight + wave;
+
+            if (i === 0) ctx.lineTo(x, topY);
+            else ctx.lineTo(x, topY);
+          }
+
+          ctx.lineTo(width, horizonY);
           ctx.closePath();
 
-          const grad = ctx.createLinearGradient(0, baselineY - currentAmp, 0, height);
-          const alpha = thumbnail ? 0.35 : 0.15 + frac * 0.15;
-          grad.addColorStop(0, hexOrRgbToRgba(accentColor, alpha));
-          grad.addColorStop(1, "rgba(9, 9, 11, 0.05)");
+          const grad = ctx.createLinearGradient(0, horizonY - curtainHeight, 0, horizonY);
+          if (fold === 0) {
+            grad.addColorStop(0, "rgba(52, 211, 153, 0)");
+            grad.addColorStop(0.3, "rgba(52, 211, 153, 0.18)");
+            grad.addColorStop(0.7, hexOrRgbToRgba(accentColor, 0.22));
+            grad.addColorStop(1, "rgba(9, 9, 11, 0)");
+          } else if (fold === 1) {
+            grad.addColorStop(0, "rgba(56, 189, 248, 0)");
+            grad.addColorStop(0.4, hexOrRgbToRgba(accentColor, 0.25));
+            grad.addColorStop(0.8, "rgba(192, 132, 252, 0.16)");
+            grad.addColorStop(1, "rgba(9, 9, 11, 0)");
+          } else {
+            grad.addColorStop(0, "rgba(255, 255, 255, 0)");
+            grad.addColorStop(0.5, hexOrRgbToRgba(accentColor, 0.18));
+            grad.addColorStop(1, "rgba(9, 9, 11, 0)");
+          }
 
-          ctx.fillStyle = i % 2 === 0 ? grad : `rgba(255, 255, 255, ${alpha * 0.35})`;
+          ctx.fillStyle = grad;
           ctx.fill();
+        }
 
-          ctx.lineWidth = thumbnail ? 1.0 : 1.6;
-          ctx.strokeStyle = i % 2 === 0 ? accentColor : "rgba(255, 255, 255, 0.4)";
-          ctx.stroke();
+        // Vertical shimmering auroral light rays
+        for (let r = 0; r < rays; r += 2) {
+          const rx = (r / rays) * width;
+          const rayH = curtainHeight * (0.5 + 0.5 * Math.sin(r * 0.5 + t * 1.5));
+          const rayAlpha = (0.05 + 0.08 * Math.cos(r * 0.4 - t * 2.0)) * (thumbnail ? 0.6 : 1.0);
+
+          const rayGrad = ctx.createLinearGradient(rx, horizonY - rayH, rx, horizonY);
+          rayGrad.addColorStop(0, "rgba(255, 255, 255, 0)");
+          rayGrad.addColorStop(0.5, hexOrRgbToRgba(accentColor, rayAlpha));
+          rayGrad.addColorStop(1, "rgba(9, 9, 11, 0)");
+
+          ctx.fillStyle = rayGrad;
+          ctx.fillRect(rx - (thumbnail ? 2 : 4), horizonY - rayH, thumbnail ? 4 : 8, rayH);
         }
 
         if (shouldAnimate) {
