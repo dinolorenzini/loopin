@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Sparkles, Dices, ArrowRight, Check, Palette, User as UserIcon } from "lucide-react";
+import { Dices, ArrowRight, Check, Palette, User as UserIcon } from "lucide-react";
 import type { User } from "../../server/types";
 import { USER_COLORS, generateRandomName, markUserOnboarded } from "../hooks/useUser";
+import { LoopinLogo } from "./LoopinLogo";
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -66,8 +67,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       <div className="profile-modal-content onboarding-content">
         <div className="profile-modal-header onboarding-header">
           <div className="modal-title-with-icon">
-            <div className="onboarding-sparkle-badge" style={{ backgroundColor: color }}>
-              <Sparkles size={20} color="#000" />
+            <div className="onboarding-logo-badge">
+              <LoopinLogo size={42} color={color} />
             </div>
             <div>
               <h2 id="onboarding-dialog-title" className="modal-title">Welcome to Loopin!</h2>

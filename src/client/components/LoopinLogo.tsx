@@ -4,14 +4,16 @@ import { useSettings } from "../hooks/useSettings";
 interface LoopinLogoProps {
   size?: number;
   className?: string;
+  color?: string;
 }
 
 export const LoopinLogo: React.FC<LoopinLogoProps> = ({
   size = 32,
   className = "",
+  color,
 }) => {
   const { settings } = useSettings();
-  const color = settings.themeColor || "var(--primary-accent)";
+  const strokeColor = color || settings.themeColor || "var(--primary-accent)";
 
   return (
     <svg
@@ -27,7 +29,7 @@ export const LoopinLogo: React.FC<LoopinLogoProps> = ({
       <rect width="64" height="64" rx="16" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
       <path
         d="M22 24C16.477 24 12 28.477 12 34C12 39.523 16.477 44 22 44C27.523 44 32 39 32 34C32 29 36.477 24 42 24C47.523 24 52 28.477 52 34C52 39.523 47.523 44 42 44C36.477 44 32 39 32 34C32 29 27.523 24 22 24Z"
-        stroke={color}
+        stroke={strokeColor}
         strokeWidth="5"
         strokeLinecap="round"
         strokeLinejoin="round"
