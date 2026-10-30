@@ -140,7 +140,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
           {/* Chat Width Toggle (Full-Screen / Centered) */}
           <button
             type="button"
-            className={`header-icon-action-btn ${settings.chatWidth === "full" ? "active" : ""}`}
+            className={`header-icon-action-btn header-chat-width-btn ${settings.chatWidth === "full" ? "active" : ""}`}
             onClick={() => updateSetting("chatWidth", settings.chatWidth === "full" ? "contained" : "full")}
             title={settings.chatWidth === "full" ? "Switch to centered chat" : "Switch to full width chat"}
             aria-label="Toggle chat width"

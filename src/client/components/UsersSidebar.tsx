@@ -57,44 +57,52 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
   if (!isOpen && !isPinned) return null;
 
   return (
-    <aside
-      className={`users-sidebar ${isPinned ? "is-pinned" : "is-overlay"}`}
-      aria-label="Room members"
-    >
-      {/* Sidebar Header */}
-      <div className="users-sidebar-header">
-        <div className="sidebar-heading-left">
-          <Users size={15} className="text-secondary" />
-          <span className="sidebar-heading-text">Members</span>
-          <span className="sidebar-count-label">
-            {onlineMembers.length}
-          </span>
-        </div>
+    <>
+      {!isPinned && (
+        <div
+          className="users-sidebar-backdrop"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`users-sidebar ${isPinned ? "is-pinned" : "is-overlay"}`}
+        aria-label="Room members"
+      >
+        {/* Sidebar Header */}
+        <div className="users-sidebar-header">
+          <div className="sidebar-heading-left">
+            <Users size={15} className="text-secondary" />
+            <span className="sidebar-heading-text">Members</span>
+            <span className="sidebar-count-label">
+              {onlineMembers.length}
+            </span>
+          </div>
 
-        <div className="sidebar-heading-tools">
-          <button
-            type="button"
-            className={`sidebar-tool-btn ${isPinned ? "active" : ""}`}
-            onClick={onTogglePin}
-            title={isPinned ? "Unpin sidebar" : "Pin sidebar to right"}
-            aria-label={isPinned ? "Unpin sidebar" : "Pin sidebar to right"}
-          >
-            {isPinned ? <PinOff size={15} /> : <Pin size={15} />}
-          </button>
-
-          {!isPinned && (
+          <div className="sidebar-heading-tools">
             <button
               type="button"
-              className="sidebar-tool-btn"
-              onClick={onClose}
-              title="Close sidebar"
-              aria-label="Close sidebar"
+              className={`sidebar-tool-btn sidebar-pin-btn ${isPinned ? "active" : ""}`}
+              onClick={onTogglePin}
+              title={isPinned ? "Unpin sidebar" : "Pin sidebar to right"}
+              aria-label={isPinned ? "Unpin sidebar" : "Pin sidebar to right"}
             >
-              <X size={15} />
+              {isPinned ? <PinOff size={15} /> : <Pin size={15} />}
             </button>
-          )}
+
+            {!isPinned && (
+              <button
+                type="button"
+                className="sidebar-tool-btn"
+                onClick={onClose}
+                title="Close sidebar"
+                aria-label="Close sidebar"
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
 
       {/* Member List Scroll Area */}
       <div className="users-sidebar-scroll-area">
@@ -178,5 +186,6 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
         )}
       </div>
     </aside>
+  </>
   );
 };
