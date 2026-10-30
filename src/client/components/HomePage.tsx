@@ -12,7 +12,7 @@ import type { User } from "../../server/types";
 import { ChatBackground } from "./ChatBackground";
 import { SettingsModal } from "./SettingsModal";
 import { LoopinLogo } from "./LoopinLogo";
-import { SettingsHintPopover } from "./SettingsHintPopover";
+import { SettingsHintPopover, dismissSettingsHintLocally } from "./SettingsHintPopover";
 import { LegalModal, type LegalDocType } from "./LegalModal";
 
 interface HomePageProps {
@@ -210,6 +210,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             type="button"
             className="header-icon-btn"
             onClick={() => {
+              dismissSettingsHintLocally();
               setSettingsCategory("appearance");
               setIsSettingsOpen(true);
             }}

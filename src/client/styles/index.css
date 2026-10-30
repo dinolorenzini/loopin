@@ -4085,12 +4085,12 @@ button:disabled {
   right: 16px;
   width: 250px;
   max-width: calc(100vw - 32px);
-  background: #18181b;
+  background: #18181b !important;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 10px 12px;
-  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  z-index: 1000;
+  box-shadow: 0 20px 48px -6px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
+  z-index: 999999 !important;
   pointer-events: auto;
   display: flex;
   flex-direction: column;
@@ -4115,10 +4115,11 @@ button:disabled {
   right: 18px;
   width: 10px;
   height: 10px;
-  background: #18181b;
+  background: #18181b !important;
   border-left: 1px solid var(--border-color);
   border-top: 1px solid var(--border-color);
   transform: rotate(45deg);
+  z-index: 1000000 !important;
 }
 
 .settings-hint-header {
