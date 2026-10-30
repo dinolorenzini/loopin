@@ -348,7 +348,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </span>
                 <input
                   id="join-chat-input"
-                  type="text"
+                  name="room_search_code"
+                  type="search"
                   value={joinInput}
                   onChange={(e) => {
                     setJoinInput(e.target.value);
@@ -357,6 +358,12 @@ export const HomePage: React.FC<HomePageProps> = ({
                   placeholder="e.g. swift-fox-42 or loopin.chat/my-room"
                   className={`text-input home-room-input ${joinError ? "input-has-error" : ""}`}
                   autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  data-form-type="other"
                   autoFocus
                 />
               </div>
@@ -388,7 +395,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <span className="room-input-prefix">#</span>
                 <input
                   id="create-slug-input"
-                  type="text"
+                  name="custom_slug_search"
+                  type="search"
                   value={createSlug}
                   onChange={(e) => {
                     const cleaned = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "");
@@ -400,6 +408,12 @@ export const HomePage: React.FC<HomePageProps> = ({
                   className={`text-input home-room-input ${createError ? "input-has-error" : ""}`}
                   maxLength={64}
                   autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  data-form-type="other"
                   autoFocus
                 />
                 <button

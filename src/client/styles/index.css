@@ -159,6 +159,17 @@ button, input, textarea, select {
   font-family: inherit;
   color: inherit;
 }
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration {
+  display: none;
+  -webkit-appearance: none;
+}
+input[type="search"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
 button {
   background: none;
   border: none;
@@ -199,6 +210,14 @@ button:disabled {
   z-index: 0;
   overflow: hidden;
 }
+.chat-bg-thumbnail {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden;
+  z-index: 1;
+}
 .chat-bg-canvas {
   position: absolute;
   inset: 0;
@@ -214,18 +233,25 @@ button:disabled {
   pointer-events: none;
   transition: background-color var(--transition-normal);
 }
+.static-bg-minimal {
+  position: absolute;
+  inset: 0;
+  background-color: #0c0d11;
+}
 .static-bg-doodle {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-color: #0f1015;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.22) 1.5px, transparent 1.5px);
+  background-size: 14px 14px;
 }
 .static-bg-grid {
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 32px 32px;
+  background-color: #0b1120;
+  background-image: linear-gradient(to right, rgba(56, 189, 248, 0.25) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(56, 189, 248, 0.25) 1px, transparent 1px);
+  background-size: 16px 16px;
 }
 
 /* ── App Layout ── */
@@ -1276,38 +1302,24 @@ button:disabled {
   color: var(--primary-accent);
 }
 
-/* ── Settings Dialog & Peek Mode ── */
+/* ── Settings Dialog ── */
 .settings-wide-dialog {
   margin: auto;
   background: transparent;
   border: none;
   padding: 0;
   outline: none;
-  max-width: 940px;
-  width: 90vw;
+  width: 920px;
+  max-width: 92vw;
+  height: 640px;
   max-height: 85vh;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
   border-radius: var(--radius-md);
   overflow: hidden;
 }
 .settings-wide-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: none; /* No heavy backdrop blur */
-}
-
-/* Peek Panel: Collapses to ~360px solid panel on left edge with NO backdrop */
-.settings-peek-panel {
-  position: fixed;
-  top: 48px;
-  left: 0;
-  bottom: 0;
-  width: 360px;
-  background: var(--surface-panel);
-  border-right: 1px solid var(--border-color);
-  z-index: 40;
-  box-shadow: var(--shadow-dropdown);
-  display: flex;
-  flex-direction: column;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: none;
 }
 
 .settings-box-container {
@@ -1319,10 +1331,6 @@ button:disabled {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   overflow: hidden;
-}
-.peek-mode {
-  border: none;
-  border-radius: 0;
 }
 
 .settings-header-bar {
@@ -1345,55 +1353,7 @@ button:disabled {
   font-weight: 600;
   letter-spacing: -0.2px;
 }
-.peek-category-select-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.peek-category-dropdown {
-  appearance: none;
-  background: var(--surface-raised);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 4px 26px 4px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-.peek-select-arrow {
-  position: absolute;
-  right: 8px;
-  pointer-events: none;
-  color: var(--text-muted);
-}
 
-.settings-header-right {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.settings-tool-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-color);
-  background: var(--surface-raised);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-.settings-tool-btn:hover {
-  background-color: var(--surface-hover);
-  color: var(--text-primary);
-}
-.settings-tool-btn.active {
-  background-color: var(--surface-hover);
-  border-color: var(--border-hover);
-  color: var(--text-primary);
-}
 .settings-close-icon-btn {
   width: 28px;
   height: 28px;
@@ -1413,11 +1373,13 @@ button:disabled {
   display: flex;
   overflow: hidden;
   position: relative;
+  min-height: 0;
 }
 
 /* Category Rail (Left 220px) */
 .settings-category-rail {
   width: 220px;
+  min-width: 220px;
   border-right: 1px solid var(--border-color);
   padding: var(--space-3) var(--space-2);
   display: flex;
@@ -1425,6 +1387,7 @@ button:disabled {
   gap: 2px;
   background: var(--surface-panel);
   flex-shrink: 0;
+  overflow-y: auto;
 }
 .rail-category-btn {
   display: flex;
@@ -1453,6 +1416,7 @@ button:disabled {
   overflow-y: auto;
   padding: var(--space-5) var(--space-6);
   overscroll-behavior: contain;
+  min-height: 0;
 }
 
 .settings-category-view {
@@ -1500,6 +1464,8 @@ button:disabled {
 .custom-hex-swatch-label {
   position: relative;
   cursor: pointer;
+  display: flex;
+  align-items: center;
 }
 .custom-hex-hidden-input {
   position: absolute;
@@ -1508,11 +1474,18 @@ button:disabled {
   height: 0;
 }
 .custom-hex-swatch-circle {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: 1px dashed var(--border-hover);
+  border: 1px solid var(--border-hover);
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+.custom-hex-swatch-label:hover .custom-hex-swatch-circle {
+  transform: scale(1.05);
+  border-color: var(--text-primary);
 }
 
 /* Theme mode pill */
@@ -2669,9 +2642,6 @@ button:disabled {
   }
   .settings-content-pane {
     padding: var(--space-4);
-  }
-  .settings-peek-panel {
-    width: 100vw;
   }
 }
 

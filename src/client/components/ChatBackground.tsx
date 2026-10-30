@@ -91,9 +91,14 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
     }
 
     const setSize = () => {
-      const parent = canvas.parentElement;
-      const w = thumbnail && parent ? parent.clientWidth : window.innerWidth;
-      const h = thumbnail && parent ? parent.clientHeight : window.innerHeight;
+      let w = window.innerWidth;
+      let h = window.innerHeight;
+      if (thumbnail) {
+        const parent = canvas.parentElement;
+        const rect = parent?.getBoundingClientRect();
+        w = rect && rect.width > 0 ? rect.width : 160;
+        h = rect && rect.height > 0 ? rect.height : 80;
+      }
       const dpr = Math.min(window.devicePixelRatio || 1, performanceMode ? 1 : thumbnail ? 1 : 1.5);
 
       canvas.width = Math.floor(w * dpr);
@@ -123,10 +128,10 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
     // ── 1. Warp Starfield ──
     if (type === "starfield") {
-      const numStars = Math.floor((config.particleCount || 160) * (thumbnail ? 0.4 : 1));
+      const numStars = Math.floor(thumbnail ? 50 : (config.particleCount || 160));
       const stars = Array.from({ length: numStars }, () => ({
-        x: (Math.random() - 0.5) * width * 2,
-        y: (Math.random() - 0.5) * height * 2,
+        x: (Math.random() - 0.5) * width * 1.8,
+        y: (Math.random() - 0.5) * height * 1.8,
         z: Math.random() * width,
         pz: width,
       }));
@@ -137,12 +142,12 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
           return;
         }
 
-        ctx.fillStyle = "rgba(9, 9, 11, 0.4)";
+        ctx.fillStyle = thumbnail ? "#09090b" : "rgba(9, 9, 11, 0.4)";
         ctx.fillRect(0, 0, width, height);
 
         const cx = width / 2;
         const cy = height / 2;
-        const starSpeed = (shouldAnimate ? 3.0 : 0.05) * speed;
+        const starSpeed = (shouldAnimate ? (thumbnail ? 2.0 : 3.0) : 0.05) * speed;
 
         for (const s of stars) {
           s.pz = s.z;
@@ -151,23 +156,23 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
             if (s.z <= 10) {
               s.z = width;
               s.pz = width;
-              s.x = (Math.random() - 0.5) * width * 2;
-              s.y = (Math.random() - 0.5) * height * 2;
+              s.x = (Math.random() - 0.5) * width * 1.8;
+              s.y = (Math.random() - 0.5) * height * 1.8;
             }
           }
 
-          const k = 220 / s.z;
+          const k = (thumbnail ? 110 : 220) / s.z;
           const px = s.x * k + cx;
           const py = s.y * k + cy;
 
-          const prevK = 220 / s.pz;
+          const prevK = (thumbnail ? 110 : 220) / s.pz;
           const prevPx = s.x * prevK + cx;
           const prevPy = s.y * prevK + cy;
 
           if (px >= 0 && px < width && py >= 0 && py < height) {
             const depth = Math.max(0, 1 - s.z / width);
             ctx.lineWidth = Math.max(0.8, depth * 2);
-            ctx.strokeStyle = depth > 0.7 ? accentColor : `rgba(255, 255, 255, ${depth * 0.7})`;
+            ctx.strokeStyle = depth > 0.65 ? accentColor : `rgba(255, 255, 255, ${depth * 0.8})`;
 
             ctx.beginPath();
             ctx.moveTo(prevPx, prevPy);
@@ -176,7 +181,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
             ctx.beginPath();
             ctx.arc(px, py, Math.max(0.6, depth * 1.5), 0, Math.PI * 2);
-            ctx.fillStyle = depth > 0.7 ? accentColor : "#ffffff";
+            ctx.fillStyle = depth > 0.65 ? accentColor : "#ffffff";
             ctx.fill();
           }
         }
@@ -190,14 +195,14 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
     // ── 2. Neural Network Constellation ──
     else if (type === "constellation") {
-      const nodeCount = Math.floor((config.particleCount || 55) * (thumbnail ? 0.35 : 1));
-      const maxDist = thumbnail ? 70 : 120;
+      const nodeCount = Math.floor(thumbnail ? 18 : (config.particleCount || 55));
+      const maxDist = thumbnail ? 50 : 120;
       const nodes = Array.from({ length: nodeCount }, () => ({
         x: Math.random() * width,
         y: Math.random() * height,
         vx: (Math.random() - 0.5) * 0.6 * speed,
         vy: (Math.random() - 0.5) * 0.6 * speed,
-        r: Math.random() * 1.8 + 1.0,
+        r: Math.random() * 1.6 + 1.0,
       }));
 
       const render = () => {
@@ -207,6 +212,11 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
         }
 
         ctx.clearRect(0, 0, width, height);
+        if (thumbnail) {
+          ctx.fillStyle = "#09090b";
+          ctx.fillRect(0, 0, width, height);
+        }
+
         const mouse = mouseRef.current;
 
         for (let i = 0; i < nodes.length; i++) {
@@ -241,7 +251,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
             const dist = Math.hypot(dx, dy);
 
             if (dist < maxDist) {
-              const alpha = (1 - dist / maxDist) * 0.28;
+              const alpha = (1 - dist / maxDist) * (thumbnail ? 0.45 : 0.28);
               ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
               ctx.lineWidth = 0.8;
               ctx.beginPath();
@@ -266,9 +276,24 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       const freq = config.waveFreq || 0.0025;
 
       const ribbons = [
-        { color: "rgba(250, 204, 21, 0.08)", yBase: 0.65, amp, freq },
-        { color: "rgba(56, 189, 248, 0.07)", yBase: 0.72, amp: amp * 1.2, freq: freq * 0.9 },
-        { color: "rgba(192, 132, 252, 0.06)", yBase: 0.78, amp: amp * 1.1, freq: freq * 1.2 },
+        {
+          color: thumbnail ? "rgba(250, 204, 21, 0.45)" : "rgba(250, 204, 21, 0.08)",
+          yBase: thumbnail ? 0.45 : 0.65,
+          amp: thumbnail ? 14 : amp,
+          freq: thumbnail ? 0.015 : freq,
+        },
+        {
+          color: thumbnail ? "rgba(56, 189, 248, 0.35)" : "rgba(56, 189, 248, 0.07)",
+          yBase: thumbnail ? 0.58 : 0.72,
+          amp: thumbnail ? 18 : amp * 1.2,
+          freq: thumbnail ? 0.012 : freq * 0.9,
+        },
+        {
+          color: thumbnail ? "rgba(192, 132, 252, 0.35)" : "rgba(192, 132, 252, 0.06)",
+          yBase: thumbnail ? 0.70 : 0.78,
+          amp: thumbnail ? 16 : amp * 1.1,
+          freq: thumbnail ? 0.018 : freq * 1.2,
+        },
       ];
 
       const render = () => {
@@ -278,8 +303,13 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
         }
 
         ctx.clearRect(0, 0, width, height);
+        if (thumbnail) {
+          ctx.fillStyle = "#09090b";
+          ctx.fillRect(0, 0, width, height);
+        }
+
         if (shouldAnimate) {
-          t += 0.012 * speed;
+          t += 0.015 * speed;
         }
 
         for (const rib of ribbons) {
@@ -287,15 +317,15 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
           const y0 = height * rib.yBase;
           ctx.moveTo(0, height);
 
-          for (let x = 0; x <= width; x += thumbnail ? 16 : 8) {
-            const y = y0 + Math.sin(x * rib.freq + t) * rib.amp + Math.cos(x * 0.001 - t * 0.8) * 20;
+          for (let x = 0; x <= width; x += thumbnail ? 6 : 8) {
+            const y = y0 + Math.sin(x * rib.freq + t) * rib.amp + Math.cos(x * 0.001 - t * 0.8) * (thumbnail ? 8 : 20);
             ctx.lineTo(x, y);
           }
 
           ctx.lineTo(width, height);
           ctx.closePath();
 
-          const grad = ctx.createLinearGradient(0, y0 - 60, 0, height);
+          const grad = ctx.createLinearGradient(0, y0 - (thumbnail ? 30 : 60), 0, height);
           grad.addColorStop(0, rib.color);
           grad.addColorStop(1, "rgba(9, 9, 11, 0)");
           ctx.fillStyle = grad;
@@ -311,9 +341,11 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
     // ── 4. Cyber Rain ──
     else if (type === "matrix") {
-      const fontSize = thumbnail ? 10 : 13;
+      const fontSize = thumbnail ? 9 : 13;
       const cols = Math.floor(width / fontSize);
-      const drops: number[] = Array.from({ length: cols }, () => Math.floor(Math.random() * -40));
+      const drops: number[] = Array.from({ length: cols }, () =>
+        thumbnail ? Math.floor(Math.random() * (height / fontSize)) : Math.floor(Math.random() * -40)
+      );
       const chars =
         config.charSet === "binary"
           ? "01"
@@ -327,7 +359,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
           return;
         }
 
-        ctx.fillStyle = "rgba(9, 9, 11, 0.2)";
+        ctx.fillStyle = thumbnail ? "rgba(9, 9, 11, 0.45)" : "rgba(9, 9, 11, 0.2)";
         ctx.fillRect(0, 0, width, height);
 
         ctx.font = `500 ${fontSize}px var(--font-mono, monospace)`;
@@ -347,10 +379,10 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
           }
 
           if (shouldAnimate) {
-            if (y > height && Math.random() > 0.98) {
+            if (y > height && Math.random() > 0.96) {
               drops[i] = 0;
             }
-            drops[i] += 0.8 * speed;
+            drops[i] += (thumbnail ? 1.0 : 0.8) * speed;
           }
         }
 
@@ -363,11 +395,11 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
     // ── 5. Fireflies ──
     else if (type === "fireflies") {
-      const count = Math.floor((config.particleCount || 40) * (thumbnail ? 0.35 : 1));
+      const count = Math.floor(thumbnail ? 14 : (config.particleCount || 40));
       const embers = Array.from({ length: count }, () => ({
         x: Math.random() * width,
         y: Math.random() * height,
-        r: Math.random() * 2.0 + 1.0,
+        r: Math.random() * 1.8 + 1.0,
         vy: -(Math.random() * 0.4 + 0.15) * speed,
         vx: (Math.random() - 0.5) * 0.3 * speed,
         phase: Math.random() * Math.PI * 2,
@@ -381,6 +413,10 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
         }
 
         ctx.clearRect(0, 0, width, height);
+        if (thumbnail) {
+          ctx.fillStyle = "#09090b";
+          ctx.fillRect(0, 0, width, height);
+        }
 
         for (const e of embers) {
           if (shouldAnimate) {
@@ -393,16 +429,16 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
             if (e.x > width + 10) e.x = -10;
           }
 
-          const alpha = (Math.sin(e.phase) + 1) * 0.5 * 0.7;
+          const alpha = (Math.sin(e.phase) + 1) * 0.5 * 0.8;
 
           // Soft aura
-          const grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * 4);
+          const grad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * (thumbnail ? 3 : 4));
           grad.addColorStop(0, accentColor);
-          grad.addColorStop(0.4, `rgba(250, 204, 21, ${alpha * 0.6})`);
+          grad.addColorStop(0.4, `rgba(250, 204, 21, ${alpha * 0.7})`);
           grad.addColorStop(1, "rgba(250, 204, 21, 0)");
 
           ctx.beginPath();
-          ctx.arc(e.x, e.y, e.r * 4, 0, Math.PI * 2);
+          ctx.arc(e.x, e.y, e.r * (thumbnail ? 3 : 4), 0, Math.PI * 2);
           ctx.fillStyle = grad;
           ctx.fill();
 
@@ -432,15 +468,20 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
         }
 
         ctx.clearRect(0, 0, width, height);
+        if (thumbnail) {
+          ctx.fillStyle = "#09090b";
+          ctx.fillRect(0, 0, width, height);
+        }
+
         if (shouldAnimate) {
           gridOffset = (gridOffset + 0.008 * speed) % 1;
         }
 
-        const sunRadius = Math.min(width * 0.16, thumbnail ? 28 : 90);
+        const sunRadius = Math.min(width * 0.16, thumbnail ? 22 : 90);
         const sunX = width / 2;
         const sunY = horizonY;
 
-        // Low-contrast restrained sun
+        // Sun
         const sunGrad = ctx.createLinearGradient(sunX, sunY - sunRadius, sunX, sunY + sunRadius);
         sunGrad.addColorStop(0, "#fde047");
         sunGrad.addColorStop(0.6, accentColor);
@@ -454,9 +495,9 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
         // Horizontal slices
         ctx.fillStyle = "#09090b";
-        for (let slice = 0; slice < 5; slice++) {
-          const sliceY = sunY - sunRadius * 0.4 + slice * (sunRadius * 0.12);
-          const sliceH = 1.5 + slice * 1.2;
+        for (let slice = 0; slice < (thumbnail ? 3 : 5); slice++) {
+          const sliceY = sunY - sunRadius * 0.4 + slice * (sunRadius * (thumbnail ? 0.18 : 0.12));
+          const sliceH = 1.2 + slice * 1.0;
           ctx.fillRect(sunX - sunRadius - 5, sliceY, (sunRadius + 5) * 2, sliceH);
         }
         ctx.restore();
@@ -471,11 +512,11 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
         // Perspective grid lines
         const groundHeight = height - horizonY;
-        const numHorizLines = thumbnail ? 8 : 14;
+        const numHorizLines = thumbnail ? 7 : 14;
         for (let i = 0; i < numHorizLines; i++) {
           const p = (i + gridOffset) / numHorizLines;
           const y = horizonY + Math.pow(p, 2.2) * groundHeight;
-          const alpha = Math.min(0.5, Math.pow(p, 1.2) * 0.5);
+          const alpha = Math.min(0.6, Math.pow(p, 1.2) * 0.6);
           ctx.strokeStyle = `rgba(250, 204, 21, ${alpha})`;
           ctx.beginPath();
           ctx.moveTo(0, y);
@@ -483,10 +524,10 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
           ctx.stroke();
         }
 
-        const numVertLines = thumbnail ? 12 : 22;
+        const numVertLines = thumbnail ? 10 : 22;
         for (let i = -numVertLines / 2; i <= numVertLines / 2; i++) {
-          const bottomX = sunX + i * (width / 12);
-          ctx.strokeStyle = "rgba(250, 204, 21, 0.18)";
+          const bottomX = sunX + i * (width / (thumbnail ? 8 : 12));
+          ctx.strokeStyle = "rgba(250, 204, 21, 0.22)";
           ctx.beginPath();
           ctx.moveTo(sunX, horizonY);
           ctx.lineTo(bottomX, height);
@@ -521,6 +562,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       )}
       {type === "telegram-doodle" && <div className="static-bg-doodle" />}
       {type === "blueprint-grid" && <div className="static-bg-grid" />}
+      {type === "minimal-dark" && thumbnail && <div className="static-bg-minimal" />}
 
       {/* Dim, Blur, Brightness, and Contrast Overlay */}
       {!thumbnail && (

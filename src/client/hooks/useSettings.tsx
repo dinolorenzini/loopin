@@ -51,7 +51,6 @@ export interface SettingsState {
   soundMuted: boolean;
   notificationsEnabled: boolean;
   activeCategory: SettingsCategory;
-  isPeek: boolean;
 }
 
 export const THEME_PRESETS = [
@@ -222,7 +221,6 @@ export const DEFAULT_SETTINGS: SettingsState = {
   soundMuted: false,
   notificationsEnabled: false,
   activeCategory: "appearance",
-  isPeek: false,
 };
 
 export function getAccessibleTextColor(hexColor?: string): string {
