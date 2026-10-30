@@ -37,27 +37,28 @@ export function useUser() {
       };
     }
 
-    // Stable user ID across tabs, reconnects, and page refreshes (Fixes Item 1 duplicate members)
-    let id = localStorage.getItem("loopin_user_id") || sessionStorage.getItem("loopin_tab_user_id");
+    // Use sessionStorage for per-tab unique client identity so 2 tabs can chat as 2 distinct users
+    let id = sessionStorage.getItem("loopin_tab_user_id");
     if (!id) {
       id = crypto.randomUUID();
+      sessionStorage.setItem("loopin_tab_user_id", id);
     }
-    localStorage.setItem("loopin_user_id", id);
-    sessionStorage.setItem("loopin_tab_user_id", id);
 
-    let name = localStorage.getItem("loopin_user_name");
+    let name = sessionStorage.getItem("loopin_user_name") || localStorage.getItem("loopin_user_name");
     if (!name) {
       name = generateRandomName().slice(0, 16);
       localStorage.setItem("loopin_user_name", name);
+      sessionStorage.setItem("loopin_user_name", name);
     } else {
       name = name.slice(0, 16);
     }
 
-    // Random name color when first joining, stable for the session/reconnects (Fixes Item 2)
-    let color = localStorage.getItem("loopin_user_color");
+    // Random name color when first joining, stable for the tab/reconnects
+    let color = sessionStorage.getItem("loopin_user_color") || localStorage.getItem("loopin_user_color");
     if (!color || !USER_COLORS.includes(color)) {
       color = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
       localStorage.setItem("loopin_user_color", color);
+      sessionStorage.setItem("loopin_user_color", color);
     }
 
     return {
@@ -74,8 +75,14 @@ export function useUser() {
       const sanitizedName = updates.name !== undefined ? updates.name.trim().slice(0, 16) : prev.name;
       const next = { ...prev, ...updates, name: sanitizedName };
       if (typeof window !== "undefined") {
-        if (updates.name !== undefined) localStorage.setItem("loopin_user_name", next.name);
-        if (updates.color !== undefined) localStorage.setItem("loopin_user_color", next.color);
+        if (updates.name !== undefined) {
+          localStorage.setItem("loopin_user_name", next.name);
+          sessionStorage.setItem("loopin_user_name", next.name);
+        }
+        if (updates.color !== undefined) {
+          localStorage.setItem("loopin_user_color", next.color);
+          sessionStorage.setItem("loopin_user_color", next.color);
+        }
       }
       return next;
     });

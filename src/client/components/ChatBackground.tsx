@@ -43,8 +43,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
     !performanceMode &&
     type !== "minimal-dark" &&
     type !== "blueprint-grid" &&
-    type !== "telegram-doodle" &&
-    (!thumbnail || isHovered);
+    type !== "telegram-doodle";
 
   // Mouse tracking on full canvas
   useEffect(() => {
@@ -117,8 +116,14 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
       height = size.height;
     };
 
+    let resizeObserver: ResizeObserver | null = null;
     if (!thumbnail) {
       window.addEventListener("resize", handleResize, { passive: true });
+    } else if (canvas.parentElement && typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(() => {
+        handleResize();
+      });
+      resizeObserver.observe(canvas.parentElement);
     }
 
     const speed = Math.max(0.1, config.speed || 1.0);
@@ -543,6 +548,7 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
 
     return () => {
       cancelAnimationFrame(animationFrameId);
+      resizeObserver?.disconnect();
       if (!thumbnail) {
         document.removeEventListener("visibilitychange", onVisibilityChange);
         window.removeEventListener("focus", onFocus);

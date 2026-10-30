@@ -133,6 +133,15 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
             break;
           }
 
+          case "users_sync": {
+            const userMap = new Map<string, User>();
+            for (const u of data.users || []) {
+              if (u && u.id) userMap.set(u.id, u);
+            }
+            setUsers(Array.from(userMap.values()));
+            break;
+          }
+
           case "user_joined": {
             setUsers((prev) => {
               const exists = prev.some((u) => u.id === data.user.id);

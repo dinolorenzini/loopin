@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Check,
   Plus,
+  Maximize2,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -436,6 +437,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <button
                         type="button"
                         className="btn-link-action"
+                        onClick={onClose}
+                        title="View shader full screen in chat"
+                      >
+                        <Maximize2 size={13} /> View full screen
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-link-action"
                         onClick={() => randomizeBgCustom(selectedBgId)}
                         title="Randomize values"
                       >
@@ -674,6 +683,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       >
                         <span className="choice-card-title">{style.label}</span>
                         <span className="choice-card-desc">{style.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Interactive Live Style Preview in Settings */}
+                  <div className="chat-style-live-preview-wrap">
+                    <span className="preview-label-tag">Live Style Preview</span>
+                    <div className="chat-style-live-preview-card" data-preview-style={settings.messageStyle}>
+                      <div className="preview-msg-row preview-other">
+                        <span className="preview-author-name" style={{ color: "#38bdf8" }}>Alex</span>
+                        <div className="preview-bubble other">
+                          Hey! Welcome to the ephemeral chat.
+                        </div>
+                        <span className="preview-time-tag">10:42 AM</span>
+                      </div>
+                      <div className="preview-msg-row preview-me">
+                        <span className="preview-author-name" style={{ color: settings.themeColor }}>You</span>
+                        <div
+                          className="preview-bubble me"
+                          style={{
+                            backgroundColor: settings.messageStyle === "inline" ? "transparent" : settings.themeColor,
+                            color: settings.messageStyle === "inline" ? "var(--text-primary)" : "var(--primary-accent-contrast)",
+                          }}
+                        >
+                          Looking sleek! Style updates instantly.
+                        </div>
+                        <span className="preview-time-tag">10:43 AM · Seen</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pane-section">
+                  <h3 className="section-title">Chat width</h3>
+                  <p className="section-desc">Choose between a centered column and edge-to-edge full width.</p>
+                  <div className="option-choice-grid">
+                    {(
+                      [
+                        { id: "contained", label: "Centered", desc: "Restrained centered column (max ~880px)" },
+                        { id: "full", label: "Full width", desc: "Edge-to-edge viewport width" },
+                      ] as { id: "contained" | "full"; label: string; desc: string }[]
+                    ).map((w) => (
+                      <button
+                        key={w.id}
+                        type="button"
+                        className={`option-choice-card ${settings.chatWidth === w.id ? "selected" : ""}`}
+                        onClick={() => updateSetting("chatWidth", w.id)}
+                      >
+                        <span className="choice-card-title">{w.label}</span>
+                        <span className="choice-card-desc">{w.desc}</span>
                       </button>
                     ))}
                   </div>

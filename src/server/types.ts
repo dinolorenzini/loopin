@@ -56,6 +56,7 @@ export type ClientMessage =
 
 export type ServerMessage =
   | { type: "init"; roomId: string; messages: Message[]; users: User[]; selfId: string }
+  | { type: "users_sync"; users: User[] }
   | { type: "user_joined"; user: User }
   | { type: "user_left"; userId: string; userName: string }
   | { type: "user_updated"; user: User }

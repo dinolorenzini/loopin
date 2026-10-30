@@ -208,6 +208,35 @@ export class RoomDurableObject extends DurableObject {
             );
           } catch {}
 
+          // Prepend Welcome announcement on first join if room has no messages
+          if (this.messages.length === 0) {
+            const welcomeMsg: Message = {
+              id: "welcome-" + this.roomId,
+              roomId: this.roomId,
+              userId: "system",
+              userName: "System",
+              userColor: "#facc15",
+              text: `Welcome to #${this.roomId}! Messages are ephemeral and disappear when everyone leaves.`,
+              timestamp: Date.now() - 1,
+              isSystem: true,
+              status: "delivered",
+            };
+            this.messages.push(welcomeMsg);
+            try {
+              this.ctx.storage.sql.exec(
+                `INSERT INTO messages (id, roomId, userId, userName, userColor, text, timestamp, isSystem) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+                welcomeMsg.id,
+                welcomeMsg.roomId,
+                welcomeMsg.userId,
+                welcomeMsg.userName,
+                welcomeMsg.userColor,
+                welcomeMsg.text || "",
+                welcomeMsg.timestamp
+              );
+            } catch {}
+          }
+
           let joinMsg: Message | undefined;
 
           // Only generate announcement and broadcast join if the user was NOT already online in the room
@@ -241,12 +270,14 @@ export class RoomDurableObject extends DurableObject {
             } catch {}
           }
 
+          const activeUsers = this.getActiveUsersList();
+
           // Send initialization data to the newly joined client
           this.sendTo(ws, {
             type: "init",
             roomId: this.roomId,
             messages: this.messages,
-            users: Array.from(this.users.values()),
+            users: activeUsers,
             selfId: user.id,
           });
 
@@ -278,6 +309,12 @@ export class RoomDurableObject extends DurableObject {
               ws
             );
           }
+
+          // Authoritative sync of current active members list across all clients
+          this.broadcast({
+            type: "users_sync",
+            users: activeUsers,
+          });
           break;
         }
 
@@ -613,6 +650,10 @@ export class RoomDurableObject extends DurableObject {
             type: "user_updated",
             user,
           });
+          this.broadcast({
+            type: "users_sync",
+            users: this.getActiveUsersList(),
+          });
           break;
         }
       }
@@ -680,6 +721,11 @@ export class RoomDurableObject extends DurableObject {
               type: "new_message",
               message: leaveMsg,
             });
+
+            this.broadcast({
+              type: "users_sync",
+              users: this.getActiveUsersList(),
+            });
           }
         }
       }
@@ -724,6 +770,16 @@ export class RoomDurableObject extends DurableObject {
       type: "typing_status",
       typingUsers: activeTyping,
     });
+  }
+
+  private getActiveUsersList(): User[] {
+    const list: User[] = [];
+    for (const [userId, user] of this.users.entries()) {
+      const sockets = this.userSockets.get(userId);
+      const isOnline = Boolean(sockets && sockets.size > 0);
+      list.push({ ...user, isOnline });
+    }
+    return list;
   }
 
   private sendTo(ws: WebSocket, message: ServerMessage): void {

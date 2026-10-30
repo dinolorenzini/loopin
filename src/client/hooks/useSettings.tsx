@@ -46,6 +46,7 @@ export interface SettingsState {
   background: BackgroundType;
   bgCustom: Record<BackgroundType, BackgroundCustomConfig>;
   messageStyle: MessageStyle;
+  chatWidth: "contained" | "full";
   noAnimations: boolean;
   performanceMode: boolean; // Chromebook & low-power mode
   soundMuted: boolean;
@@ -216,6 +217,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   background: "minimal-dark",
   bgCustom: DEFAULT_BG_CONFIG,
   messageStyle: "modern",
+  chatWidth: "contained",
   noAnimations: false,
   performanceMode: false,
   soundMuted: false,
@@ -293,6 +295,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     root.setAttribute("data-message-style", settings.messageStyle);
     root.setAttribute("data-no-animations", settings.noAnimations ? "true" : "false");
     root.setAttribute("data-perf-mode", settings.performanceMode ? "true" : "false");
+    root.setAttribute("data-chat-width", settings.chatWidth || "contained");
 
     const currentBgConfig = settings.bgCustom[settings.background] || DEFAULT_BG_CONFIG[settings.background];
     if (currentBgConfig) {

@@ -183,7 +183,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
       className={`message-row ${isMe ? "message-row-me" : "message-row-other"} ${groupClasses}`}
     >
       <div className="msg-content-wrapper">
-        {/* Header with username, timestamp, and read status */}
+        {/* Header with username and timestamp */}
         {isFirstInGroup && (
           <div className="msg-outside-header">
             {!isMe && (
@@ -192,78 +192,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
               </span>
             )}
             <span className="msg-timestamp-outside">{timeFormatted}</span>
-
-            {/* Read Receipts & Status */}
-            {isMe && (
-              <div className="msg-status-receipts" ref={readersRef}>
-                {message.status === "sending" ? (
-                  <span className="msg-status-wrap" title="Sending...">
-                    <Clock size={11} className="status-sending-icon" />
-                  </span>
-                ) : readerUsers.length === 0 ? (
-                  <span className="msg-status-wrap" title="Delivered">
-                    <Check size={12} className="status-delivered-icon" />
-                  </span>
-                ) : (
-                  <div
-                    className="readers-avatars-row"
-                    onClick={() => setShowReadersPopover(!showReadersPopover)}
-                    title={`Read by: ${readerUsers.map((r) => r.name).join(", ")}`}
-                  >
-                    {readerUsers.slice(0, 3).map((reader) => (
-                      <span
-                        key={reader.id}
-                        className="reader-avatar-badge"
-                        style={{
-                          backgroundColor: reader.color || "var(--primary-accent)",
-                          color: getContrastTextColor(reader.color),
-                        }}
-                      >
-                        {getInitials(reader.name)}
-                      </span>
-                    ))}
-
-                    {readerUsers.length > 3 && (
-                      <span className="reader-avatar-badge reader-avatar-more">
-                        +{readerUsers.length - 3}
-                      </span>
-                    )}
-
-                    {readerUsers.length === 1 && (
-                      <span className="reader-single-name">
-                        {readerUsers[0].name}
-                      </span>
-                    )}
-
-                    <CheckCheck size={12} className="status-read-icon" />
-
-                    {showReadersPopover && (
-                      <div className="readers-popover-card" onClick={(e) => e.stopPropagation()}>
-                        <div className="readers-popover-title">Read by ({readerUsers.length})</div>
-                        <div className="readers-popover-list">
-                          {readerUsers.map((r) => (
-                            <div key={r.id} className="reader-popover-item">
-                              <span
-                                className="reader-avatar-badge small"
-                                style={{
-                                  backgroundColor: r.color || "var(--primary-accent)",
-                                  color: getContrastTextColor(r.color),
-                                }}
-                              >
-                                {getInitials(r.name)}
-                              </span>
-                              <span className="reader-popover-name" style={{ color: r.color }}>
-                                {r.name}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
 
@@ -483,6 +411,76 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {/* Read Receipts & Delivery Status directly BELOW the message bubble */}
+        {isMe && (
+          <div className="msg-below-footer" ref={readersRef}>
+            {message.status === "sending" ? (
+              <span className="msg-status-wrap" title="Sending...">
+                <Clock size={11} className="status-sending-icon" />
+              </span>
+            ) : readerUsers.length === 0 ? (
+              <span className="msg-status-wrap" title="Delivered">
+                <Check size={12} className="status-delivered-icon" />
+              </span>
+            ) : (
+              <div
+                className="readers-avatars-row"
+                onClick={() => setShowReadersPopover(!showReadersPopover)}
+                title={`Read by: ${readerUsers.map((r) => r.name).join(", ")}`}
+              >
+                {readerUsers.slice(0, 3).map((reader) => (
+                  <span
+                    key={reader.id}
+                    className="reader-avatar-badge"
+                    style={{
+                      backgroundColor: reader.color || "var(--primary-accent)",
+                      color: getContrastTextColor(reader.color),
+                    }}
+                  >
+                    {getInitials(reader.name)}
+                  </span>
+                ))}
+
+                {readerUsers.length > 3 && (
+                  <span className="reader-avatar-badge reader-avatar-more">
+                    +{readerUsers.length - 3}
+                  </span>
+                )}
+
+                <span className="reader-status-label">
+                  {readerUsers.length === 1 ? `Seen by ${readerUsers[0].name}` : `Seen by ${readerUsers.length}`}
+                </span>
+
+                <CheckCheck size={12} className="status-read-icon" />
+
+                {showReadersPopover && (
+                  <div className="readers-popover-card" onClick={(e) => e.stopPropagation()}>
+                    <div className="readers-popover-title">Read by ({readerUsers.length})</div>
+                    <div className="readers-popover-list">
+                      {readerUsers.map((r) => (
+                        <div key={r.id} className="reader-popover-item">
+                          <span
+                            className="reader-avatar-badge small"
+                            style={{
+                              backgroundColor: r.color || "var(--primary-accent)",
+                              color: getContrastTextColor(r.color),
+                            }}
+                          >
+                            {getInitials(r.name)}
+                          </span>
+                          <span className="reader-popover-name" style={{ color: r.color }}>
+                            {r.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -11,6 +11,7 @@ import {
 import { EmojiPicker } from "./EmojiPicker";
 import { GifPicker } from "./GifPicker";
 import { processImageToBase64 } from "../utils/image";
+import { MarkdownRenderer } from "../utils/markdown";
 import type { Message, ReplyReference } from "../../server/types";
 
 interface ChatInputProps {
@@ -280,7 +281,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       )}
 
-      {/* 4. Compact Main Input Box */}
+      {/* 4. Live Markdown Preview inside input box */}
+      {text.trim().length > 0 && /[*_`~#>[\]]/.test(text) && (
+        <div className="live-markdown-preview-pane" aria-label="Markdown live preview">
+          <div className="live-markdown-header">
+            <span className="live-markdown-tag">Live Markdown</span>
+          </div>
+          <div className="live-markdown-body">
+            <MarkdownRenderer content={text} />
+          </div>
+        </div>
+      )}
+
+      {/* 5. Compact Main Input Box */}
       <div className="chat-input-box">
         <input
           ref={fileInputRef}

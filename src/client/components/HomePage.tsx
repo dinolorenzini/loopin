@@ -4,16 +4,10 @@ import {
   Clock,
   Trash2,
   Settings,
-  Link2,
-  Plus,
-  RefreshCw,
+  Hash,
   AlertCircle,
-  CheckCircle2,
-  Loader2,
-  LogIn,
 } from "lucide-react";
 import type { User } from "../../server/types";
-import { useSettings } from "../hooks/useSettings";
 import { ChatBackground } from "./ChatBackground";
 import { SettingsModal } from "./SettingsModal";
 import { LoopinLogo } from "./LoopinLogo";
@@ -104,17 +98,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   currentUser,
   onUpdateUser,
 }) => {
-  const [mode, setMode] = useState<"join" | "create">("join");
-
-  // Join mode state
-  const [joinInput, setJoinInput] = useState("");
-  const [joinError, setJoinError] = useState<string | null>(null);
-
-  // Create mode state
-  const [createSlug, setCreateSlug] = useState(() => generateRoomSlug());
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
-  const [slugStatus, setSlugStatus] = useState<"available" | "taken" | null>(null);
+  const [roomInput, setRoomInput] = useState("");
+  const [inputError, setInputError] = useState<string | null>(null);
 
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -146,103 +131,43 @@ export const HomePage: React.FC<HomePageProps> = ({
     setRecentRooms([]);
   };
 
-  // Handle Join Submit
-  const handleJoinSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setJoinError(null);
+    setInputError(null);
 
-    const raw = joinInput.trim();
+    const raw = roomInput.trim();
+    // If empty: Create brand new lobby with random slug
     if (!raw) {
-      setJoinError("Please enter a chat code or link to join.");
+      const randomRoom = generateRoomSlug();
+      saveAndJoin(randomRoom);
       return;
     }
 
     const parsed = parseRoomInput(raw);
     if (!parsed) {
-      setJoinError("Please enter a valid chat code or link.");
+      setInputError("Please enter a valid chat code or link.");
       return;
     }
 
     if (!/^[a-z0-9_-]+$/.test(parsed)) {
-      setJoinError("Chat code can only contain letters, numbers, hyphens, and underscores.");
+      setInputError("Chat code can only contain letters, numbers, hyphens, and underscores.");
       return;
     }
 
     if (parsed.length < 2) {
-      setJoinError("Chat code must be at least 2 characters long.");
+      setInputError("Chat code must be at least 2 characters long.");
       return;
     }
 
     if (parsed.length > 64) {
-      setJoinError("Chat code cannot exceed 64 characters.");
+      setInputError("Chat code cannot exceed 64 characters.");
       return;
     }
 
     saveAndJoin(parsed);
   };
 
-  // Check custom slug availability
-  const checkSlugAvailability = async (slugToCheck: string): Promise<boolean> => {
-    try {
-      setIsCheckingSlug(true);
-      const res = await fetch(`/api/room/${encodeURIComponent(slugToCheck)}/check`);
-      if (res.ok) {
-        const data = (await res.json()) as { taken?: boolean };
-        const taken = Boolean(data.taken);
-        setSlugStatus(taken ? "taken" : "available");
-        return !taken;
-      }
-    } catch {
-      // In case check endpoint is unreachable, assume available
-    } finally {
-      setIsCheckingSlug(false);
-    }
-    setSlugStatus(null);
-    return true;
-  };
-
-  // Handle Create Submit
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreateError(null);
-
-    const clean = createSlug.trim().toLowerCase().replace(/^[#@]+/, "");
-    if (!clean) {
-      setCreateError("Please enter a room name or generate a random one.");
-      return;
-    }
-
-    if (!/^[a-z0-9_-]+$/.test(clean)) {
-      setCreateError("Room names can only contain letters, numbers, hyphens, and underscores.");
-      return;
-    }
-
-    if (clean.length < 2) {
-      setCreateError("Room name must be at least 2 characters long.");
-      return;
-    }
-
-    if (clean.length > 64) {
-      setCreateError("Room name cannot exceed 64 characters.");
-      return;
-    }
-
-    // Check if taken
-    const isFree = await checkSlugAvailability(clean);
-    if (!isFree) {
-      setCreateError("This room name is currently taken. Choose another or join it directly.");
-      return;
-    }
-
-    saveAndJoin(clean);
-  };
-
-  const handleRandomizeSlug = () => {
-    const fresh = generateRoomSlug();
-    setCreateSlug(fresh);
-    setCreateError(null);
-    setSlugStatus(null);
-  };
+  const hasEnteredCode = Boolean(roomInput.trim());
 
   return (
     <div className="home-container">
@@ -266,16 +191,16 @@ export const HomePage: React.FC<HomePageProps> = ({
       </header>
 
       <main className="home-content">
-        {/* Brand Hero (Logo without glow as requested) */}
+        {/* Brand Hero (Logo centered with quiet tagline) */}
         <div className="home-hero">
-          <LoopinLogo size={60} className="home-logo-bare" />
+          <div className="home-logo-wrap">
+            <LoopinLogo size={56} className="home-logo-bare" />
+          </div>
           <h1 className="home-title">
             Loop<span className="text-accent">in</span>
           </h1>
           <p className="home-tagline">
             Simple, fast, private ephemeral chats.
-            <br />
-            Join with a code or link, or create a custom room in seconds.
           </p>
         </div>
 
@@ -305,156 +230,57 @@ export const HomePage: React.FC<HomePageProps> = ({
             <span className="home-user-edit-link">Edit</span>
           </div>
 
-          {/* Mode Switcher Tabs */}
-          <div className="home-mode-tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "join"}
-              className={`home-tab-btn ${mode === "join" ? "active" : ""}`}
-              onClick={() => {
-                setMode("join");
-                setJoinError(null);
-              }}
-            >
-              <LogIn size={15} />
-              <span>Join Chat</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "create"}
-              className={`home-tab-btn ${mode === "create" ? "active" : ""}`}
-              onClick={() => {
-                setMode("create");
-                setCreateError(null);
-              }}
-            >
-              <Plus size={15} />
-              <span>Create New Chat</span>
-            </button>
-          </div>
-
-          {/* 1. Join Chat Form */}
-          {mode === "join" ? (
-            <form onSubmit={handleJoinSubmit} className="join-chat-box">
-              <label htmlFor="join-chat-input" className="join-box-label">
-                Enter a code or link to join a chat
+          {/* Unified Action Form */}
+          <form onSubmit={handleSubmit} className="join-chat-box">
+            <div className="join-box-label-row">
+              <label htmlFor="home-room-input" className="join-box-label">
+                Room code or link
               </label>
+              <span className="join-box-label-hint">optional</span>
+            </div>
 
-              <div className="room-input-wrap">
-                <span className="room-input-prefix">
-                  <Link2 size={16} />
-                </span>
-                <input
-                  id="join-chat-input"
-                  name="room_search_code"
-                  type="search"
-                  value={joinInput}
-                  onChange={(e) => {
-                    setJoinInput(e.target.value);
-                    if (joinError) setJoinError(null);
-                  }}
-                  placeholder="e.g. swift-fox-42 or loopin.chat/my-room"
-                  className={`text-input home-room-input ${joinError ? "input-has-error" : ""}`}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  data-1p-ignore="true"
-                  data-lpignore="true"
-                  data-form-type="other"
-                  autoFocus
-                />
+            <div className="room-input-wrap">
+              <span className="room-input-prefix">
+                <Hash size={15} />
+              </span>
+              <input
+                id="home-room-input"
+                name="room_search_code"
+                type="search"
+                value={roomInput}
+                onChange={(e) => {
+                  setRoomInput(e.target.value);
+                  if (inputError) setInputError(null);
+                }}
+                maxLength={64}
+                placeholder="e.g. swift-fox-42 (leave empty for new lobby)"
+                className={`text-input home-room-input ${inputError ? "input-has-error" : ""}`}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                data-1p-ignore="true"
+                data-lpignore="true"
+                data-form-type="other"
+                autoFocus
+              />
+            </div>
+
+            {inputError && (
+              <div className="home-inline-error" role="alert">
+                <AlertCircle size={14} className="error-icon" />
+                <span>{inputError}</span>
               </div>
+            )}
 
-              {joinError && (
-                <div className="home-inline-error" role="alert">
-                  <AlertCircle size={14} className="error-icon" />
-                  <span>{joinError}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="btn btn-primary full-width-btn submit-action-btn"
-                disabled={!joinInput.trim()}
-              >
-                <span>Join Chat</span>
-                <ArrowRight size={16} className="btn-arrow" />
-              </button>
-            </form>
-          ) : (
-            /* 2. Create New Chat Form with Custom Slug */
-            <form onSubmit={handleCreateSubmit} className="create-chat-box">
-              <label htmlFor="create-slug-input" className="join-box-label">
-                Customize your room code or link
-              </label>
-
-              <div className="room-input-wrap">
-                <span className="room-input-prefix">#</span>
-                <input
-                  id="create-slug-input"
-                  name="custom_slug_search"
-                  type="search"
-                  value={createSlug}
-                  onChange={(e) => {
-                    const cleaned = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "");
-                    setCreateSlug(cleaned);
-                    if (createError) setCreateError(null);
-                    setSlugStatus(null);
-                  }}
-                  placeholder="custom-room-slug"
-                  className={`text-input home-room-input ${createError ? "input-has-error" : ""}`}
-                  maxLength={64}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  data-1p-ignore="true"
-                  data-lpignore="true"
-                  data-form-type="other"
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  className="slug-randomize-btn"
-                  onClick={handleRandomizeSlug}
-                  title="Generate random name"
-                >
-                  <RefreshCw size={14} />
-                </button>
-              </div>
-
-              {isCheckingSlug ? (
-                <div className="slug-checking-hint">
-                  <Loader2 size={12} className="spinner" />
-                  <span>Checking room availability...</span>
-                </div>
-              ) : slugStatus === "available" && !createError ? (
-                <div className="slug-status-available">
-                  <CheckCircle2 size={13} className="text-emerald" />
-                  <span>Room is ready and available</span>
-                </div>
-              ) : null}
-
-              {createError && (
-                <div className="home-inline-error" role="alert">
-                  <AlertCircle size={14} className="error-icon" />
-                  <span>{createError}</span>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                className="btn btn-primary full-width-btn submit-action-btn"
-                disabled={!createSlug.trim() || isCheckingSlug}
-              >
-                <span>Create & Join Room</span>
-                <ArrowRight size={16} className="btn-arrow" />
-              </button>
-            </form>
-          )}
+            <button
+              type="submit"
+              className="btn btn-primary full-width-btn submit-action-btn"
+            >
+              <span>{hasEnteredCode ? "Join chat" : "Create new lobby"}</span>
+              <ArrowRight size={16} className="btn-arrow" />
+            </button>
+          </form>
 
           {/* Recent Rooms */}
           {recentRooms.length > 0 && (
@@ -490,6 +316,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </main>
 
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
