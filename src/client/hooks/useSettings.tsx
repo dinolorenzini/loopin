@@ -253,12 +253,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [settings, setSettings] = useState<SettingsState>(() => {
     if (typeof window === "undefined") return DEFAULT_SETTINGS;
     try {
-      const saved = localStorage.getItem("loopin_settings_v3");
+      const saved = localStorage.getItem("loopin_settings_v4") || localStorage.getItem("loopin_settings_v3");
       if (saved) {
         const parsed = JSON.parse(saved);
+        const bg = (!parsed.background || parsed.background === "minimal-dark") ? "starfield" : parsed.background;
         return {
           ...DEFAULT_SETTINGS,
           ...parsed,
+          background: bg,
           bgCustom: {
             ...DEFAULT_BG_CONFIG,
             ...(parsed.bgCustom || {}),
@@ -306,7 +308,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     try {
-      localStorage.setItem("loopin_settings_v3", JSON.stringify(settings));
+      localStorage.setItem("loopin_settings_v4", JSON.stringify(settings));
     } catch {}
   }, [settings]);
 
@@ -372,6 +374,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const resetAllDefaults = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);
     try {
+      localStorage.removeItem("loopin_settings_v4");
       localStorage.removeItem("loopin_settings_v3");
       localStorage.removeItem("loopin_settings");
     } catch {}
