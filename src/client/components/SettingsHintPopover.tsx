@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Sliders, X, ArrowUpRight } from "lucide-react";
 
 interface SettingsHintPopoverProps {
@@ -7,6 +7,7 @@ interface SettingsHintPopoverProps {
 
 export const SettingsHintPopover: React.FC<SettingsHintPopoverProps> = ({ onOpenSettings }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const popoverRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     // Check if user has already dismissed the hint
@@ -35,10 +36,50 @@ export const SettingsHintPopover: React.FC<SettingsHintPopoverProps> = ({ onOpen
     onOpenSettings();
   };
 
+  // Dismiss on outside click, scroll, or Escape key
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        handleDismiss();
+      }
+    };
+
+    const handleScroll = () => {
+      handleDismiss();
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleDismiss();
+      }
+    };
+
+    // Auto-timeout after 9 seconds of inactivity so it never clutters the screen
+    const autoDismissTimer = setTimeout(() => {
+      handleDismiss();
+    }, 9000);
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("touchstart", handleOutsideClick, { passive: true });
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      clearTimeout(autoDismissTimer);
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+      window.removeEventListener("scroll", handleScroll);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isVisible]);
+
   if (!isVisible) return null;
 
   return (
     <aside
+      ref={popoverRef}
       className="settings-hint-popover"
       aria-label="Settings notification"
       role="complementary"
@@ -46,7 +87,7 @@ export const SettingsHintPopover: React.FC<SettingsHintPopoverProps> = ({ onOpen
       <div className="settings-hint-arrow" aria-hidden="true" />
       <div className="settings-hint-header">
         <div className="settings-hint-badge">
-          <Sliders size={14} className="text-accent" />
+          <Sliders size={13} className="text-accent" />
         </div>
         <span className="settings-hint-title">Personalize Loopin</span>
         <button
@@ -61,7 +102,7 @@ export const SettingsHintPopover: React.FC<SettingsHintPopoverProps> = ({ onOpen
       </div>
 
       <p className="settings-hint-body">
-        Use <strong>Settings</strong> to customize themes, animated background shaders, sound effects, and privacy.
+        Tap <strong>Settings</strong> to customize themes, animated backgrounds, and privacy.
       </p>
 
       <div className="settings-hint-actions">

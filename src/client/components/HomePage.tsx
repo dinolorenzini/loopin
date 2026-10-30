@@ -290,7 +290,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   if (inputError) setInputError(null);
                 }}
                 maxLength={64}
-                placeholder="e.g. swift-fox-42 (leave empty for new lobby)"
+                placeholder="e.g. swift-fox-42"
                 className={`text-input home-room-input ${inputError ? "input-has-error" : ""}`}
                 autoComplete="off"
                 autoCorrect="off"

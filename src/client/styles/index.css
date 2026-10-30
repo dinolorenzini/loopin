@@ -2381,7 +2381,8 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  z-index: 10;
+  z-index: 100;
+  position: relative;
 }
 
 .home-top-bar-right {
@@ -2471,6 +2472,29 @@ dialog::backdrop {
   outline-offset: 2px;
   border-radius: 2px;
 }
+
+@media (max-width: 640px) {
+  .home-top-bar {
+    height: 48px;
+    padding: 0 12px;
+  }
+  .home-brand-badge {
+    height: 30px;
+    padding: 0 8px;
+    gap: 6px;
+    font-size: 11px;
+    max-width: calc(100vw - 60px);
+  }
+  .home-brand-badge-logo {
+    width: 15px;
+    height: 15px;
+  }
+  .header-icon-btn {
+    width: 30px;
+    height: 30px;
+  }
+}
+
 .home-content {
   flex: 1;
   display: flex;
@@ -2478,7 +2502,17 @@ dialog::backdrop {
   align-items: center;
   justify-content: center;
   padding: var(--space-6) var(--space-4);
-  z-index: 10;
+  z-index: 1;
+}
+
+@media (max-width: 640px) {
+  .home-content {
+    padding: var(--space-4) var(--space-3);
+  }
+  .home-hero {
+    margin-top: 12px;
+    margin-bottom: var(--space-4);
+  }
 }
 .home-hero {
   display: flex;
@@ -4047,20 +4081,20 @@ button:disabled {
    ========================================================================== */
 .settings-hint-popover {
   position: fixed;
-  top: 52px;
+  top: 56px;
   right: 16px;
-  width: 290px;
+  width: 250px;
   max-width: calc(100vw - 32px);
-  background: var(--surface-panel);
+  background: #18181b;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 12px 14px;
-  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
   z-index: 1000;
   pointer-events: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   animation: hintSlideDown 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -4081,7 +4115,7 @@ button:disabled {
   right: 18px;
   width: 10px;
   height: 10px;
-  background: var(--surface-panel);
+  background: #18181b;
   border-left: 1px solid var(--border-color);
   border-top: 1px solid var(--border-color);
   transform: rotate(45deg);
@@ -4095,8 +4129,8 @@ button:disabled {
 }
 
 .settings-hint-badge {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: var(--radius-sm);
   background: rgba(250, 204, 21, 0.12);
   display: flex;
@@ -4106,7 +4140,7 @@ button:disabled {
 }
 
 .settings-hint-title {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   flex: 1;
@@ -4131,9 +4165,9 @@ button:disabled {
 }
 
 .settings-hint-body {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-secondary);
-  line-height: 1.45;
+  line-height: 1.4;
   margin: 0;
 }
 
@@ -4151,9 +4185,9 @@ button:disabled {
   background: var(--surface-raised);
   border: 1px solid var(--border-color);
   color: var(--primary-accent);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 5px 10px;
+  padding: 4px 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   display: inline-flex;
@@ -4165,6 +4199,30 @@ button:disabled {
 .settings-hint-action-btn:hover {
   background: var(--surface-hover);
   border-color: var(--primary-accent);
+}
+
+@media (max-width: 640px) {
+  .settings-hint-popover {
+    top: 50px;
+    right: 12px;
+    width: 210px;
+    padding: 8px 10px;
+    gap: 4px;
+  }
+  .settings-hint-arrow {
+    right: 16px;
+  }
+  .settings-hint-title {
+    font-size: 11px;
+  }
+  .settings-hint-body {
+    font-size: 10.5px;
+    line-height: 1.35;
+  }
+  .settings-hint-action-btn {
+    font-size: 10.5px;
+    padding: 3px 7px;
+  }
 }
 
 /* ==========================================================================

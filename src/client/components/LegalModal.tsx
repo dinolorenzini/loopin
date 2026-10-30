@@ -135,9 +135,9 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                 TO THE MAXIMUM EXTENT PERMITTED BY LAW, LOOPIN, ITS DIRECTORS, EMPLOYEES, AND PARTNERS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, CONSEQUENTIAL, SPECIAL, OR PUNITIVE DAMAGES, OR FOR LOSS OF PROFITS, DATA, OR PRIVACY ARISING FROM YOUR USE OF OR INABILITY TO USE THE SERVICE.
               </p>
 
-              <h3>6. Modifications to Terms</h3>
+              <h3>6. Modifications &amp; Legal Inquiries</h3>
               <p>
-                We reserve the right to revise these Terms at any time by updating this document. Continued use of Loopin constitutes acceptance of any revisions.
+                We reserve the right to revise these Terms at any time by updating this document. Continued use of Loopin constitutes acceptance of any revisions. For legal notices, DMCA requests, or abuse reports, contact <code>legal@peretas.live</code>.
               </p>
             </div>
           ) : (
@@ -182,7 +182,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
 
               <h3>5. Contact &amp; Questions</h3>
               <p>
-                If you have inquiries regarding privacy practices or technical security, contact the Loopin security team at <code>privacy@loopin.chat</code>.
+                If you have inquiries regarding privacy practices or technical security, contact the Loopin security team at <code>privacy@peretas.live</code>.
               </p>
             </div>
           )}
