@@ -12,7 +12,9 @@ export type BackgroundType =
   | "aurora"
   | "matrix"
   | "fireflies"
-  | "retro-grid";
+  | "retro-grid"
+  | "topographic"
+  | "webgl-mesh";
 
 export type SettingsCategory =
   | "appearance"
@@ -30,6 +32,7 @@ export interface BackgroundCustomConfig {
   brightness: number; // 0.5 to 1.5
   contrast: number; // 0.5 to 1.5
   speed: number; // 0.2 to 2.5
+  verticalOffset?: number; // -100 to 100 (% offset to move shader up/down or cover whole screen)
   // Specialized parameters
   particleCount?: number;
   waveAmp?: number;
@@ -136,6 +139,20 @@ export const BACKGROUND_LIST: BackgroundMeta[] = [
     description: "Perspective horizon grid and sliced sun.",
     heavy: true,
   },
+  {
+    id: "topographic",
+    name: "Topographic",
+    category: "animated",
+    description: "Flowing contour elevation lines.",
+    heavy: false,
+  },
+  {
+    id: "webgl-mesh",
+    name: "WebGL Fluid",
+    category: "animated",
+    description: "Hardware-accelerated reactive shader mesh.",
+    heavy: true,
+  },
 ];
 
 export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> = {
@@ -145,6 +162,7 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
     brightness: 1.0,
     contrast: 1.0,
     speed: 1.0,
+    verticalOffset: 0,
   },
   "blueprint-grid": {
     dim: 0.2,
@@ -152,6 +170,7 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
     brightness: 1.0,
     contrast: 1.0,
     speed: 1.0,
+    verticalOffset: 0,
   },
   "telegram-doodle": {
     dim: 0.25,
@@ -159,6 +178,7 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
     brightness: 1.0,
     contrast: 1.0,
     speed: 1.0,
+    verticalOffset: 0,
   },
   starfield: {
     dim: 0.35,
@@ -167,6 +187,7 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
     contrast: 1.0,
     speed: 0.8,
     particleCount: 160,
+    verticalOffset: 0,
   },
   constellation: {
     dim: 0.35,
@@ -175,6 +196,7 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
     contrast: 1.0,
     speed: 0.7,
     particleCount: 55,
+    verticalOffset: 0,
   },
   aurora: {
     dim: 0.3,
@@ -184,6 +206,7 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
     speed: 0.7,
     waveAmp: 45,
     waveFreq: 0.0025,
+    verticalOffset: 0,
   },
   matrix: {
     dim: 0.3,
@@ -193,6 +216,7 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
     speed: 0.8,
     trailLength: 28,
     charSet: "matrix",
+    verticalOffset: 0,
   },
   fireflies: {
     dim: 0.3,
@@ -201,6 +225,7 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
     contrast: 1.0,
     speed: 0.7,
     particleCount: 40,
+    verticalOffset: 0,
   },
   "retro-grid": {
     dim: 0.35,
@@ -208,6 +233,23 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
     brightness: 1.0,
     contrast: 1.0,
     speed: 0.7,
+    verticalOffset: 0,
+  },
+  topographic: {
+    dim: 0.3,
+    blur: 0,
+    brightness: 1.0,
+    contrast: 1.0,
+    speed: 0.6,
+    verticalOffset: 0,
+  },
+  "webgl-mesh": {
+    dim: 0.35,
+    blur: 0,
+    brightness: 1.0,
+    contrast: 1.0,
+    speed: 0.7,
+    verticalOffset: 0,
   },
 };
 

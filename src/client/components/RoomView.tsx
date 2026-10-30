@@ -271,43 +271,69 @@ export const RoomView: React.FC<RoomViewProps> = ({
               </div>
             ) : (
               <div className="messages-stream">
-                {messages.map((msg, index) => {
-                  const prev = messages[index - 1];
-                  const next = messages[index + 1];
-                  const isMe = msg.userId === currentUser.id;
+                {(() => {
+                  // Determine exactly which message gets the single 'seen' and single 'delivered' indicator
+                  let latestSeenMyMsgId: string | null = null;
+                  let latestDeliveredOnlyMyMsgId: string | null = null;
 
-                  // Sequential clustering: 5 min window
-                  const isFirstInGroup =
-                    !prev ||
-                    prev.userId !== msg.userId ||
-                    prev.isSystem ||
-                    msg.timestamp - prev.timestamp > 300000;
+                  for (let i = messages.length - 1; i >= 0; i--) {
+                    const m = messages[i];
+                    if (m.userId === currentUser.id && !m.isSystem) {
+                      const hasOtherReaders = (m.readBy || []).some(
+                        (readerId) => readerId !== currentUser.id && users.some((u) => u.id === readerId)
+                      );
+                      if (hasOtherReaders && !latestSeenMyMsgId) {
+                        latestSeenMyMsgId = m.id;
+                      }
+                      if (!hasOtherReaders && !latestDeliveredOnlyMyMsgId) {
+                        latestDeliveredOnlyMyMsgId = m.id;
+                      }
+                    }
+                  }
 
-                  const isLastInGroup =
-                    !next ||
-                    next.userId !== msg.userId ||
-                    next.isSystem ||
-                    next.timestamp - msg.timestamp > 300000;
+                  return messages.map((msg, index) => {
+                    const prev = messages[index - 1];
+                    const next = messages[index + 1];
+                    const isMe = msg.userId === currentUser.id;
 
-                  return (
-                    <MessageItem
-                      key={msg.id}
-                      message={msg}
-                      isMe={isMe}
-                      currentUserId={currentUser.id}
-                      isFirstInGroup={isFirstInGroup}
-                      isLastInGroup={isLastInGroup}
-                      users={users}
-                      onEdit={editMessage}
-                      onDelete={deleteMessage}
-                      onReact={reactMessage}
-                      onExpandImage={(url) => setLightboxImage(url)}
-                      onReply={(targetMsg) => setReplyingTo(targetMsg)}
-                      onScrollToMessage={scrollToMessage}
-                      isTargetAvailable={isTargetAvailable}
-                    />
-                  );
-                })}
+                    // Sequential clustering: 5 min window
+                    const isFirstInGroup =
+                      !prev ||
+                      prev.userId !== msg.userId ||
+                      prev.isSystem ||
+                      msg.timestamp - prev.timestamp > 300000;
+
+                    const isLastInGroup =
+                      !next ||
+                      next.userId !== msg.userId ||
+                      next.isSystem ||
+                      next.timestamp - msg.timestamp > 300000;
+
+                    const isLatestSeen = latestSeenMyMsgId === msg.id;
+                    const isLatestDelivered = latestDeliveredOnlyMyMsgId === msg.id;
+
+                    return (
+                      <MessageItem
+                        key={msg.id}
+                        message={msg}
+                        isMe={isMe}
+                        currentUserId={currentUser.id}
+                        isFirstInGroup={isFirstInGroup}
+                        isLastInGroup={isLastInGroup}
+                        showSeen={isLatestSeen}
+                        showDelivered={isLatestDelivered}
+                        users={users}
+                        onEdit={editMessage}
+                        onDelete={deleteMessage}
+                        onReact={reactMessage}
+                        onExpandImage={(url) => setLightboxImage(url)}
+                        onReply={(targetMsg) => setReplyingTo(targetMsg)}
+                        onScrollToMessage={scrollToMessage}
+                        isTargetAvailable={isTargetAvailable}
+                      />
+                    );
+                  });
+                })()}
                 <div ref={messagesEndRef} className="scroll-anchor" />
               </div>
             )}

@@ -18,6 +18,8 @@ interface MessageItemProps {
   currentUserId: string;
   isFirstInGroup: boolean;
   isLastInGroup: boolean;
+  showDelivered?: boolean;
+  showSeen?: boolean;
   users?: User[];
   onEdit: (id: string, newText: string) => void;
   onDelete: (id: string) => void;
@@ -55,6 +57,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   currentUserId,
   isFirstInGroup,
   isLastInGroup,
+  showDelivered = false,
+  showSeen = false,
   users = [],
   onEdit,
   onDelete,
@@ -415,17 +419,19 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         )}
 
         {/* Read Receipts & Delivery Status directly BELOW the message bubble */}
-        {isMe && (
+        {isMe && (showSeen || showDelivered) && (
           <div className="msg-below-footer" ref={readersRef}>
-            {message.status === "sending" ? (
+            {showDelivered && message.status === "sending" && (
               <span className="msg-status-wrap" title="Sending...">
                 <Clock size={11} className="status-sending-icon" />
               </span>
-            ) : readerUsers.length === 0 ? (
+            )}
+            {showDelivered && message.status !== "sending" && (
               <span className="msg-status-wrap" title="Delivered">
                 <Check size={12} className="status-delivered-icon" />
               </span>
-            ) : (
+            )}
+            {showSeen && readerUsers.length > 0 && (
               <div
                 className="readers-avatars-row"
                 onClick={() => setShowReadersPopover(!showReadersPopover)}

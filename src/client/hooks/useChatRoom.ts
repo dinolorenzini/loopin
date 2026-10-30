@@ -103,7 +103,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
         }
       }
 
-      // Start keep-alive ping heartbeat every 25 seconds
+      // Start keep-alive ping heartbeat every 10 seconds to prevent edge proxy timeouts
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       pingIntervalRef.current = window.setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -111,7 +111,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
             ws.send(JSON.stringify({ type: "ping" }));
           } catch {}
         }
-      }, 25000);
+      }, 10000);
     };
 
     ws.onmessage = (event) => {
@@ -275,7 +275,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
         if (isMountedRef.current) {
           connect();
         }
-      }, 2000);
+      }, 1000);
     };
 
     ws.onerror = () => {

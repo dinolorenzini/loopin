@@ -393,7 +393,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 <div className="pane-section">
-                  <h3 className="section-title">Animated</h3>
+                  <div className="section-title-wrap">
+                    <h3 className="section-title">Animated</h3>
+                    <span className="section-title-hint">Hover to preview background</span>
+                  </div>
                   <div className="bg-cards-grid">
                     {BACKGROUND_LIST.filter((b) => b.category === "animated").map((bg) => {
                       const isSelected = selectedBgId === bg.id;
@@ -492,17 +495,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {selectedBgId !== "minimal-dark" &&
                       selectedBgId !== "blueprint-grid" &&
                       selectedBgId !== "telegram-doodle" && (
-                        <CustomRangeSlider
-                          label="Animation speed"
-                          value={currentBgConfig.speed}
-                          min={0.2}
-                          max={2.5}
-                          step={0.1}
-                          displayValue={`${currentBgConfig.speed.toFixed(1)}x`}
-                          defaultValue={defaultBgConfig.speed}
-                          onChange={(val) => updateBgCustom(selectedBgId, { speed: val })}
-                          onReset={() => updateBgCustom(selectedBgId, { speed: defaultBgConfig.speed })}
-                        />
+                        <>
+                          <CustomRangeSlider
+                            label="Animation speed"
+                            value={currentBgConfig.speed}
+                            min={0.2}
+                            max={2.5}
+                            step={0.1}
+                            displayValue={`${currentBgConfig.speed.toFixed(1)}x`}
+                            defaultValue={defaultBgConfig.speed}
+                            onChange={(val) => updateBgCustom(selectedBgId, { speed: val })}
+                            onReset={() => updateBgCustom(selectedBgId, { speed: defaultBgConfig.speed })}
+                          />
+
+                          <CustomRangeSlider
+                            label="Vertical position / Screen coverage"
+                            value={currentBgConfig.verticalOffset ?? 0}
+                            min={-100}
+                            max={100}
+                            step={5}
+                            displayValue={`${(currentBgConfig.verticalOffset ?? 0) > 0 ? "+" : ""}${currentBgConfig.verticalOffset ?? 0}%`}
+                            defaultValue={0}
+                            onChange={(val) => updateBgCustom(selectedBgId, { verticalOffset: val })}
+                            onReset={() => updateBgCustom(selectedBgId, { verticalOffset: 0 })}
+                          />
+                        </>
                       )}
 
                     {/* Specialized: Starfield Particle Count */}

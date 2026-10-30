@@ -133,8 +133,9 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
         ctx.fillStyle = thumbnail ? "#09090b" : "rgba(9, 9, 11, 0.4)";
         ctx.fillRect(0, 0, width, height);
 
+        const vOffset = (config.verticalOffset || 0) / 100;
         const cx = width / 2;
-        const cy = height / 2;
+        const cy = height * (0.5 - vOffset * 0.4);
         const starSpeed = (shouldAnimate ? (thumbnail ? 2.0 : 3.0) : 0.05) * speed;
 
         for (const s of stars) {
@@ -300,9 +301,10 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
           t += 0.015 * speed;
         }
 
+        const vOffset = (config.verticalOffset || 0) / 100;
         for (const rib of ribbons) {
           ctx.beginPath();
-          const y0 = height * rib.yBase;
+          const y0 = height * Math.max(0.1, rib.yBase - vOffset * 0.35);
           ctx.moveTo(0, height);
 
           for (let x = 0; x <= width; x += thumbnail ? 6 : 8) {
@@ -447,7 +449,9 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
     // ── 6. Synthwave 80s ──
     else if (type === "retro-grid") {
       let gridOffset = 0;
-      const horizonY = height * 0.55;
+      const vOffset = (config.verticalOffset || 0) / 100;
+      // Moving slider to negative moves horizon up, so grid covers the screen
+      const horizonY = height * Math.max(0.08, Math.min(0.92, 0.55 + vOffset * 0.42));
 
       const render = () => {
         if (!thumbnail && !isTabVisible) {
@@ -519,6 +523,148 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
           ctx.beginPath();
           ctx.moveTo(sunX, horizonY);
           ctx.lineTo(bottomX, height);
+          ctx.stroke();
+        }
+
+        if (shouldAnimate) {
+          animationFrameId = requestAnimationFrame(render);
+        }
+      };
+      render();
+    }
+
+    // ── 7. Topographic Contours ──
+    else if (type === "topographic") {
+      let t = 0;
+      const vOffset = (config.verticalOffset || 0) / 100;
+      const numLines = thumbnail ? 8 : 18;
+
+      const render = () => {
+        if (!thumbnail && !isTabVisible) {
+          animationFrameId = requestAnimationFrame(render);
+          return;
+        }
+
+        ctx.clearRect(0, 0, width, height);
+        if (thumbnail) {
+          ctx.fillStyle = "#09090b";
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        if (shouldAnimate) {
+          t += 0.008 * speed;
+        }
+
+        const centerY = height * (0.5 - vOffset * 0.45);
+
+        for (let i = 0; i < numLines; i++) {
+          const frac = (i + 1) / (numLines + 1);
+          const baseRadius = frac * Math.max(width, height) * 0.75;
+          const isAccent = i % 4 === 0;
+
+          ctx.beginPath();
+          ctx.lineWidth = isAccent ? (thumbnail ? 1.2 : 1.6) : (thumbnail ? 0.7 : 0.9);
+          ctx.strokeStyle = isAccent
+            ? accentColor
+            : `rgba(255, 255, 255, ${thumbnail ? 0.25 : 0.08 + frac * 0.12})`;
+
+          const points = thumbnail ? 24 : 64;
+          for (let p = 0; p <= points; p++) {
+            const angle = (p / points) * Math.PI * 2;
+            const wave1 = Math.sin(angle * 3 + t + i * 0.4) * (thumbnail ? 8 : 22);
+            const wave2 = Math.cos(angle * 5 - t * 0.8 + i * 0.2) * (thumbnail ? 5 : 14);
+            const r = baseRadius + wave1 + wave2;
+
+            const px = width * 0.5 + Math.cos(angle) * r * (width / Math.max(width, height));
+            const py = centerY + Math.sin(angle) * r;
+
+            if (p === 0) {
+              ctx.moveTo(px, py);
+            } else {
+              ctx.lineTo(px, py);
+            }
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+
+        if (shouldAnimate) {
+          animationFrameId = requestAnimationFrame(render);
+        }
+      };
+      render();
+    }
+
+    // ── 8. WebGL Fluid Mesh ──
+    else if (type === "webgl-mesh") {
+      let t = 0;
+      const vOffset = (config.verticalOffset || 0) / 100;
+      const cols = thumbnail ? 10 : 22;
+      const rows = thumbnail ? 7 : 14;
+
+      const render = () => {
+        if (!thumbnail && !isTabVisible) {
+          animationFrameId = requestAnimationFrame(render);
+          return;
+        }
+
+        ctx.clearRect(0, 0, width, height);
+        if (thumbnail) {
+          ctx.fillStyle = "#09090b";
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        if (shouldAnimate) {
+          t += 0.012 * speed;
+        }
+
+        const cellW = width / cols;
+        const cellH = height / rows;
+        const centerYShift = vOffset * height * 0.45;
+
+        ctx.lineWidth = thumbnail ? 0.8 : 1.0;
+
+        // Flowing horizontal lines
+        for (let r = 0; r <= rows; r++) {
+          ctx.beginPath();
+          for (let c = 0; c <= cols; c++) {
+            const baseX = c * cellW;
+            const baseY = r * cellH + centerYShift;
+
+            const waveX = Math.sin(c * 0.4 + t + r * 0.2) * (thumbnail ? 4 : 14);
+            const waveY = Math.cos(r * 0.5 - t + c * 0.3) * (thumbnail ? 5 : 16);
+            const px = baseX + waveX;
+            const py = baseY + waveY;
+
+            if (c === 0) {
+              ctx.moveTo(px, py);
+            } else {
+              ctx.lineTo(px, py);
+            }
+          }
+          ctx.strokeStyle = `rgba(250, 204, 21, ${thumbnail ? 0.22 : 0.08 + (r / rows) * 0.12})`;
+          ctx.stroke();
+        }
+
+        // Flowing vertical lines
+        for (let c = 0; c <= cols; c++) {
+          ctx.beginPath();
+          for (let r = 0; r <= rows; r++) {
+            const baseX = c * cellW;
+            const baseY = r * cellH + centerYShift;
+
+            const waveX = Math.sin(c * 0.4 + t + r * 0.2) * (thumbnail ? 4 : 14);
+            const waveY = Math.cos(r * 0.5 - t + c * 0.3) * (thumbnail ? 5 : 16);
+            const px = baseX + waveX;
+            const py = baseY + waveY;
+
+            if (r === 0) {
+              ctx.moveTo(px, py);
+            } else {
+              ctx.lineTo(px, py);
+            }
+          }
+          ctx.strokeStyle = `rgba(255, 255, 255, ${thumbnail ? 0.14 : 0.06})`;
           ctx.stroke();
         }
 
