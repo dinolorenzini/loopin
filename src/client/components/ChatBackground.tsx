@@ -26,20 +26,8 @@ export const ChatBackground: React.FC<ChatBackgroundProps> = ({
   const config: BackgroundCustomConfig =
     settings.bgCustom[type] || DEFAULT_BG_CONFIG[type] || DEFAULT_BG_CONFIG["minimal-dark"];
 
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setPrefersReducedMotion(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-
   const shouldAnimate =
     !noAnimations &&
-    !prefersReducedMotion &&
     !performanceMode &&
     type !== "minimal-dark" &&
     type !== "blueprint-grid" &&
