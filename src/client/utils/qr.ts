@@ -182,31 +182,31 @@ export function generateQrMatrix(text: string): boolean[][] {
   // 4. Dark Module
   setModule(N - 8, 8, true);
 
-  // 5. Format Information Reservation (Level L, Mask 0: BCH format bits = 0x77c4 = 0b111011111000100)
-  const formatBits = 0x77c4; // 15 bits: 111011111000100
-  for (let i = 0; i < 15; i++) {
-    const bit = ((formatBits >> (14 - i)) & 1) === 1;
+  // 5. Format Information (Level L, Mask 0: 0x77c4 = 15 bits: 111011111000100)
+  // Placement strictly matches ISO/IEC 18004
+  const formatBits = 0x77c4;
+  const getBit = (x: number, i: number) => ((x >>> i) & 1) !== 0;
 
-    // Top-left finder
-    if (i <= 5) {
-      setModule(8, i, bit);
-    } else if (i === 6) {
-      setModule(8, 7, bit);
-    } else if (i === 7) {
-      setModule(8, 8, bit);
-    } else if (i === 8) {
-      setModule(7, 8, bit);
-    } else {
-      setModule(14 - i, 8, bit);
-    }
-
-    // Top-right & Bottom-left split
-    if (i < 8) {
-      setModule(N - 1 - i, 8, bit);
-    } else {
-      setModule(8, N - 15 + i, bit);
-    }
+  // First copy around top-left finder pattern
+  for (let i = 0; i <= 5; i++) {
+    setModule(i, 8, getBit(formatBits, i));
   }
+  setModule(7, 8, getBit(formatBits, 6));
+  setModule(8, 8, getBit(formatBits, 7));
+  setModule(8, 7, getBit(formatBits, 8));
+  for (let i = 9; i < 15; i++) {
+    setModule(8, 14 - i, getBit(formatBits, i));
+  }
+
+  // Second copy: adjacent to top-right and bottom-left finders
+  for (let i = 0; i < 8; i++) {
+    setModule(8, N - 1 - i, getBit(formatBits, i));
+  }
+  for (let i = 8; i < 15; i++) {
+    setModule(N - 15 + i, 8, getBit(formatBits, i));
+  }
+  // Ensure dark module is dark
+  setModule(N - 8, 8, true);
 
   // 6. Place Data + Error Correction bits in 2-column zig-zag
   let bitIdx = 0;

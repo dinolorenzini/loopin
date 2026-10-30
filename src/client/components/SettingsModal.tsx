@@ -14,11 +14,16 @@ import {
   Check,
   Plus,
   Maximize2,
+  Lock,
+  FileText,
+  Trash2,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
 import {
   useSettings,
   THEME_PRESETS,
+  BG_BASE_COLORS,
   BACKGROUND_LIST,
   DEFAULT_BG_CONFIG,
   type SettingsCategory,
@@ -28,6 +33,7 @@ import {
 } from "../hooks/useSettings";
 import { USER_COLORS } from "../hooks/useUser";
 import { ChatBackground } from "./ChatBackground";
+import { LegalModal, type LegalDocType } from "./LegalModal";
 import type { User } from "../../server/types";
 
 interface SettingsModalProps {
@@ -131,6 +137,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const [hoveredBg, setHoveredBg] = useState<BackgroundType | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isPeekingBackground, setIsPeekingBackground] = useState(false);
+  const [isLegalOpen, setIsLegalOpen] = useState(false);
+  const [legalDocType, setLegalDocType] = useState<LegalDocType>("tos");
 
   // Profile Form state
   const [profileName, setProfileName] = useState(currentUser?.name || "");
@@ -235,18 +245,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <dialog
-      ref={dialogRef}
-      className="settings-wide-dialog"
-      aria-labelledby="settings-dialog-title"
-      aria-modal="true"
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === dialogRef.current) {
-          onClose();
-        }
-      }}
-    >
+    <>
+      {isPeekingBackground && (
+        <div
+          className="peeking-floating-badge"
+          onClick={() => setIsPeekingBackground(false)}
+          title="Click to restore settings modal"
+        >
+          <Eye size={14} className="text-accent" />
+          <span>Viewing background &bull; Click to return</span>
+        </div>
+      )}
+
+      <dialog
+        ref={dialogRef}
+        className={`settings-wide-dialog ${isPeekingBackground ? "peeking-background" : ""}`}
+        aria-labelledby="settings-dialog-title"
+        aria-modal="true"
+        onClose={onClose}
+        onClick={(e) => {
+          if (e.target === dialogRef.current) {
+            onClose();
+          }
+        }}
+      >
       <div className="settings-box-container">
         {/* Fixed Header */}
         <div className="settings-header-bar">
@@ -359,6 +381,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* 2. BACKGROUND */}
             {activeTab === "background" && (
               <div className="settings-category-view">
+                {/* Background Base Color */}
+                <div className="pane-section">
+                  <div className="section-title-wrap">
+                    <h3 className="section-title">Background base color</h3>
+                    <span className="section-title-hint">Custom canvas tint &amp; tone</span>
+                  </div>
+                  <div className="bg-base-color-row">
+                    {BG_BASE_COLORS.map((c) => (
+                      <button
+                        key={c.color}
+                        type="button"
+                        className={`bg-color-swatch-btn ${settings.backgroundColor === c.color ? "selected" : ""}`}
+                        style={{ backgroundColor: c.color }}
+                        onClick={() => updateSetting("backgroundColor", c.color)}
+                        title={c.name}
+                      >
+                        {settings.backgroundColor === c.color && <Check size={14} color="#fff" strokeWidth={3} />}
+                      </button>
+                    ))}
+                    <label className="custom-color-picker-label" title="Custom base color">
+                      <input
+                        type="color"
+                        value={settings.backgroundColor || "#09090b"}
+                        onChange={(e) => updateSetting("backgroundColor", e.target.value)}
+                        className="native-color-picker-input"
+                      />
+                      <Plus size={14} />
+                    </label>
+                  </div>
+                </div>
+
                 <div className="pane-section">
                   <h3 className="section-title">Simple</h3>
                   <div className="bg-cards-grid">
@@ -439,11 +492,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div className="tuning-actions-group">
                       <button
                         type="button"
-                        className="btn-link-action"
-                        onClick={onClose}
-                        title="View shader full screen in chat"
+                        className={`btn-link-action ${isPeekingBackground ? "active" : ""}`}
+                        onMouseEnter={() => setIsPeekingBackground(true)}
+                        onMouseLeave={() => setIsPeekingBackground(false)}
+                        onClick={() => setIsPeekingBackground((prev) => !prev)}
+                        title="Hover to lower opacity and preview background"
                       >
-                        <Maximize2 size={13} /> View full screen
+                        <Eye size={13} /> {isPeekingBackground ? "Peeking background..." : "View full screen"}
                       </button>
                       <button
                         type="button"
@@ -642,6 +697,114 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         onReset={() =>
                           updateBgCustom("fireflies", { particleCount: defaultBgConfig.particleCount })
                         }
+                      />
+                    )}
+
+                    {/* Specialized: Topographic */}
+                    {selectedBgId === "topographic" && (
+                      <>
+                        <CustomRangeSlider
+                          label="Elevation contour lines"
+                          value={currentBgConfig.contourDensity || 12}
+                          min={4}
+                          max={24}
+                          step={2}
+                          displayValue={String(currentBgConfig.contourDensity || 12)}
+                          defaultValue={defaultBgConfig.contourDensity || 12}
+                          onChange={(val) => updateBgCustom("topographic", { contourDensity: val })}
+                          onReset={() =>
+                            updateBgCustom("topographic", { contourDensity: defaultBgConfig.contourDensity })
+                          }
+                        />
+                        <CustomRangeSlider
+                          label="Elevation wave amplitude"
+                          value={currentBgConfig.waveAmp || 40}
+                          min={15}
+                          max={80}
+                          step={5}
+                          displayValue={`${currentBgConfig.waveAmp || 40}px`}
+                          defaultValue={defaultBgConfig.waveAmp || 40}
+                          onChange={(val) => updateBgCustom("topographic", { waveAmp: val })}
+                          onReset={() => updateBgCustom("topographic", { waveAmp: defaultBgConfig.waveAmp })}
+                        />
+                        <CustomRangeSlider
+                          label="Contour line thickness"
+                          value={currentBgConfig.lineThickness || 1.5}
+                          min={1}
+                          max={3.5}
+                          step={0.5}
+                          displayValue={`${(currentBgConfig.lineThickness || 1.5).toFixed(1)}px`}
+                          defaultValue={defaultBgConfig.lineThickness || 1.5}
+                          onChange={(val) => updateBgCustom("topographic", { lineThickness: val })}
+                          onReset={() =>
+                            updateBgCustom("topographic", { lineThickness: defaultBgConfig.lineThickness })
+                          }
+                        />
+                        <CustomRangeSlider
+                          label="Contour elevation scale"
+                          value={currentBgConfig.waveFreq || 0.003}
+                          min={0.001}
+                          max={0.006}
+                          step={0.0005}
+                          displayValue={(currentBgConfig.waveFreq || 0.003).toFixed(4)}
+                          defaultValue={defaultBgConfig.waveFreq || 0.003}
+                          onChange={(val) => updateBgCustom("topographic", { waveFreq: val })}
+                          onReset={() => updateBgCustom("topographic", { waveFreq: defaultBgConfig.waveFreq })}
+                        />
+                      </>
+                    )}
+
+                    {/* Specialized: Waves */}
+                    {selectedBgId === "waves" && (
+                      <>
+                        <CustomRangeSlider
+                          label="Wave amplitude"
+                          value={currentBgConfig.waveAmp || 42}
+                          min={15}
+                          max={90}
+                          step={5}
+                          displayValue={`${currentBgConfig.waveAmp || 42}px`}
+                          defaultValue={defaultBgConfig.waveAmp || 42}
+                          onChange={(val) => updateBgCustom("waves", { waveAmp: val })}
+                          onReset={() => updateBgCustom("waves", { waveAmp: defaultBgConfig.waveAmp })}
+                        />
+                        <CustomRangeSlider
+                          label="Wave frequency"
+                          value={currentBgConfig.waveFreq || 0.003}
+                          min={0.001}
+                          max={0.006}
+                          step={0.0005}
+                          displayValue={(currentBgConfig.waveFreq || 0.003).toFixed(4)}
+                          defaultValue={defaultBgConfig.waveFreq || 0.003}
+                          onChange={(val) => updateBgCustom("waves", { waveFreq: val })}
+                          onReset={() => updateBgCustom("waves", { waveFreq: defaultBgConfig.waveFreq })}
+                        />
+                        <CustomRangeSlider
+                          label="Ribbon layers"
+                          value={currentBgConfig.ribbonCount || 5}
+                          min={2}
+                          max={8}
+                          step={1}
+                          displayValue={String(currentBgConfig.ribbonCount || 5)}
+                          defaultValue={defaultBgConfig.ribbonCount || 5}
+                          onChange={(val) => updateBgCustom("waves", { ribbonCount: val })}
+                          onReset={() => updateBgCustom("waves", { ribbonCount: defaultBgConfig.ribbonCount })}
+                        />
+                      </>
+                    )}
+
+                    {/* Specialized: Vortex */}
+                    {selectedBgId === "vortex" && (
+                      <CustomRangeSlider
+                        label="Particle count"
+                        value={currentBgConfig.particleCount || 130}
+                        min={40}
+                        max={260}
+                        step={10}
+                        displayValue={String(currentBgConfig.particleCount || 130)}
+                        defaultValue={defaultBgConfig.particleCount || 130}
+                        onChange={(val) => updateBgCustom("vortex", { particleCount: val })}
+                        onReset={() => updateBgCustom("vortex", { particleCount: defaultBgConfig.particleCount })}
                       />
                     )}
 
@@ -931,42 +1094,133 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* 7. PRIVACY & DATA */}
             {activeTab === "privacy" && (
               <div className="settings-category-view">
-                <div className="pane-section">
-                  <h3 className="section-title">Local storage</h3>
-                  <p className="section-desc">All user data, settings, and room history stay strictly on your device.</p>
+                {/* 1. Architecture Card */}
+                <div className="privacy-feature-card">
+                  <div className="privacy-feature-badge">
+                    <Shield size={20} className="text-accent" />
+                  </div>
+                  <div className="privacy-feature-text">
+                    <h4 className="privacy-card-title">RAM-Only Ephemeral Architecture</h4>
+                    <p className="privacy-card-desc">
+                      Messages live strictly in temporary volatile memory (RAM) within Cloudflare Workers &amp; Durable Objects. When everyone leaves a room or the room goes inactive, all messages evaporate permanently.
+                    </p>
+                  </div>
+                </div>
 
-                  {confirmClear ? (
-                    <div className="confirm-wipe-card">
-                      <AlertTriangle size={16} className="text-danger" />
-                      <span className="confirm-wipe-text">
-                        Clear all local data and recent rooms immediately?
-                      </span>
-                      <div className="confirm-wipe-actions">
-                        <button
-                          type="button"
-                          className="btn-neutral-outline"
-                          onClick={() => setConfirmClear(false)}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-danger-solid"
-                          onClick={clearAllData}
-                        >
-                          Yes, clear everything
-                        </button>
+                {/* 2. Zero Tracking Card */}
+                <div className="privacy-feature-card">
+                  <div className="privacy-feature-badge">
+                    <Lock size={20} className="text-accent" />
+                  </div>
+                  <div className="privacy-feature-text">
+                    <h4 className="privacy-card-title">Zero Tracking &amp; No Accounts</h4>
+                    <p className="privacy-card-desc">
+                      Loopin does not use tracking cookies, analytics pixels, or user profiling. No email or phone number is ever requested.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Legal Documents */}
+                <div className="pane-section">
+                  <h3 className="section-title">Legal &amp; Compliance</h3>
+                  <p className="section-desc">Review our transparent ephemeral chat policies and acceptable use agreements.</p>
+                  <div className="legal-doc-cards-grid">
+                    <div className="legal-doc-card">
+                      <div className="legal-doc-card-info">
+                        <FileText size={16} className="text-accent" />
+                        <div>
+                          <span className="legal-doc-card-title">Terms of Service</span>
+                          <span className="legal-doc-card-sub">Acceptable use, volatility, and disclaimers</span>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        className="btn-neutral-outline"
+                        onClick={() => {
+                          setLegalDocType("tos");
+                          setIsLegalOpen(true);
+                        }}
+                      >
+                        Read Terms
+                      </button>
                     </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn-neutral-outline"
-                      onClick={() => setConfirmClear(true)}
-                    >
-                      Clear all local data
-                    </button>
-                  )}
+
+                    <div className="legal-doc-card">
+                      <div className="legal-doc-card-info">
+                        <Shield size={16} className="text-accent" />
+                        <div>
+                          <span className="legal-doc-card-title">Privacy Policy</span>
+                          <span className="legal-doc-card-sub">Data minimization, RAM storage, and deletion</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-neutral-outline"
+                        onClick={() => {
+                          setLegalDocType("privacy");
+                          setIsLegalOpen(true);
+                        }}
+                      >
+                        Read Policy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Local Storage Management */}
+                <div className="pane-section">
+                  <h3 className="section-title">Device Storage</h3>
+                  <p className="section-desc">Client data saved locally in your browser&rsquo;s <code>localStorage</code>:</p>
+
+                  <div className="storage-items-list">
+                    <div className="storage-item-row">
+                      <span className="storage-item-key">loopin_user</span>
+                      <span className="storage-item-desc">Your display name and selected name color</span>
+                    </div>
+                    <div className="storage-item-row">
+                      <span className="storage-item-key">loopin_settings_v4</span>
+                      <span className="storage-item-desc">Themes, shader settings, and audio preferences</span>
+                    </div>
+                    <div className="storage-item-row">
+                      <span className="storage-item-key">loopin_recent_rooms</span>
+                      <span className="storage-item-desc">Shortcuts to your recently visited rooms</span>
+                    </div>
+                  </div>
+
+                  <div className="storage-danger-zone">
+                    {confirmClear ? (
+                      <div className="confirm-wipe-card">
+                        <AlertTriangle size={16} className="text-danger" />
+                        <span className="confirm-wipe-text">
+                          Clear all stored nicknames, settings, and room shortcuts on this browser?
+                        </span>
+                        <div className="confirm-wipe-actions">
+                          <button
+                            type="button"
+                            className="btn-neutral-outline"
+                            onClick={() => setConfirmClear(false)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-danger-solid"
+                            onClick={clearAllData}
+                          >
+                            Yes, wipe local data
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn-neutral-outline btn-wipe-data"
+                        onClick={() => setConfirmClear(true)}
+                      >
+                        <Trash2 size={14} /> Clear all local data
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -978,7 +1232,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             type="button"
             className="btn-text-subtle"
-            onClick={resetAllDefaults}
+            onClick={() => setShowResetConfirm(true)}
           >
             Reset all to defaults
           </button>
@@ -996,6 +1250,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Confirmation Dialog for Reset All to Defaults */}
+      {showResetConfirm && (
+        <div className="reset-confirm-backdrop" onClick={() => setShowResetConfirm(false)}>
+          <div className="reset-confirm-card" onClick={(e) => e.stopPropagation()}>
+            <div className="reset-confirm-header">
+              <div className="reset-warning-badge">
+                <AlertTriangle size={18} color="#f59e0b" />
+              </div>
+              <div>
+                <h3 className="reset-confirm-title">Reset all settings to defaults?</h3>
+                <p className="reset-confirm-subtitle">
+                  This will restore your themes, animated background shaders, sound effects, and layout preferences to their initial defaults. Your nickname and room history will not be lost.
+                </p>
+              </div>
+            </div>
+            <div className="reset-confirm-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowResetConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-warning-solid"
+                onClick={() => {
+                  resetAllDefaults();
+                  setShowResetConfirm(false);
+                }}
+              >
+                Reset Defaults
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Legal Documents Modal */}
+      <LegalModal
+        isOpen={isLegalOpen}
+        onClose={() => setIsLegalOpen(false)}
+        initialDoc={legalDocType}
+      />
     </dialog>
+  </>
   );
 };

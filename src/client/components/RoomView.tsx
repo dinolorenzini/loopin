@@ -44,6 +44,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -358,10 +359,18 @@ export const RoomView: React.FC<RoomViewProps> = ({
                         showDelivered={isLatestDelivered}
                         users={users}
                         onEdit={editMessage}
+                        onStartEdit={(targetMsg) => {
+                          setReplyingTo(null);
+                          setEditingMessage(targetMsg);
+                        }}
+                        isBeingEdited={editingMessage?.id === msg.id}
                         onDelete={deleteMessage}
                         onReact={reactMessage}
                         onExpandImage={(url) => setLightboxImage(url)}
-                        onReply={(targetMsg) => setReplyingTo(targetMsg)}
+                        onReply={(targetMsg) => {
+                          setEditingMessage(null);
+                          setReplyingTo(targetMsg);
+                        }}
                         onScrollToMessage={scrollToMessage}
                         isTargetAvailable={isTargetAvailable}
                       />
@@ -381,6 +390,12 @@ export const RoomView: React.FC<RoomViewProps> = ({
             typingUsers={typingUsers}
             replyingTo={replyingTo}
             onCancelReply={() => setReplyingTo(null)}
+            editingMessage={editingMessage}
+            onCancelEdit={() => setEditingMessage(null)}
+            onSaveEdit={(id, newText) => {
+              editMessage(id, newText);
+              setEditingMessage(null);
+            }}
           />
         </div>
 

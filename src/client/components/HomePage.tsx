@@ -12,6 +12,8 @@ import type { User } from "../../server/types";
 import { ChatBackground } from "./ChatBackground";
 import { SettingsModal } from "./SettingsModal";
 import { LoopinLogo } from "./LoopinLogo";
+import { SettingsHintPopover } from "./SettingsHintPopover";
+import { LegalModal, type LegalDocType } from "./LegalModal";
 
 interface HomePageProps {
   onJoinRoom: (room: string) => void;
@@ -105,6 +107,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [recentRooms, setRecentRooms] = useState<RecentRoom[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsCategory, setSettingsCategory] = useState<"appearance" | "profile" | "background">("appearance");
+  const [isLegalOpen, setIsLegalOpen] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDocType>("tos");
 
   useEffect(() => {
     try {
@@ -175,20 +179,52 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* Background canvas */}
       <ChatBackground />
 
-      {/* Top Bar for Settings */}
+      {/* Top Bar for Attribution & Settings */}
       <header className="home-top-bar">
-        <button
-          type="button"
-          className="header-icon-btn"
-          onClick={() => {
-            setSettingsCategory("appearance");
-            setIsSettingsOpen(true);
-          }}
-          title="Open Settings"
-          aria-label="Open Settings"
-        >
-          <Settings size={18} />
-        </button>
+        <div className="home-brand-badge" aria-label="Developer attribution">
+          <img
+            src="https://peretas.live/images/logo.png"
+            alt="Peretas Technologies Logo"
+            className="home-brand-badge-logo"
+            width={18}
+            height={18}
+            loading="eager"
+            decoding="async"
+          />
+          <span className="home-brand-badge-text">
+            Developed by{" "}
+            <a
+              href="https://peretas.live"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="home-brand-badge-link"
+              title="Visit Peretas Technologies (opens in new tab)"
+            >
+              Peretas Technologies
+            </a>
+          </span>
+        </div>
+
+        <div className="home-top-bar-right">
+          <button
+            type="button"
+            className="header-icon-btn"
+            onClick={() => {
+              setSettingsCategory("appearance");
+              setIsSettingsOpen(true);
+            }}
+            title="Open Settings"
+            aria-label="Open Settings"
+          >
+            <Settings size={18} />
+          </button>
+          <SettingsHintPopover
+            onOpenSettings={() => {
+              setSettingsCategory("appearance");
+              setIsSettingsOpen(true);
+            }}
+          />
+        </div>
       </header>
 
       <main className="home-content">
@@ -309,6 +345,33 @@ export const HomePage: React.FC<HomePageProps> = ({
             </button>
           </div>
 
+          {/* Legal Disclaimer */}
+          <div className="home-legal-disclaimer">
+            By joining a chat, you agree to our{" "}
+            <button
+              type="button"
+              className="home-legal-link"
+              onClick={() => {
+                setLegalDoc("tos");
+                setIsLegalOpen(true);
+              }}
+            >
+              Terms of Service
+            </button>{" "}
+            and{" "}
+            <button
+              type="button"
+              className="home-legal-link"
+              onClick={() => {
+                setLegalDoc("privacy");
+                setIsLegalOpen(true);
+              }}
+            >
+              Privacy Policy
+            </button>
+            .
+          </div>
+
           {/* Recent Rooms */}
           {recentRooms.length > 0 && (
             <div className="recent-rooms-section">
@@ -350,6 +413,13 @@ export const HomePage: React.FC<HomePageProps> = ({
         initialCategory={settingsCategory}
         currentUser={currentUser}
         onUpdateUser={onUpdateUser}
+      />
+
+      {/* Legal Documents Modal */}
+      <LegalModal
+        isOpen={isLegalOpen}
+        onClose={() => setIsLegalOpen(false)}
+        initialDoc={legalDoc}
       />
     </div>
   );

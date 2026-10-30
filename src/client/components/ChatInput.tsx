@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   Send,
   Image as ImageIcon,
@@ -7,11 +7,12 @@ import {
   Loader2,
   X,
   Reply,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { EmojiPicker } from "./EmojiPicker";
 import { GifPicker } from "./GifPicker";
 import { processImageToBase64 } from "../utils/image";
-import { MarkdownRenderer } from "../utils/markdown";
 import type { Message, ReplyReference } from "../../server/types";
 
 interface ChatInputProps {
@@ -26,6 +27,157 @@ interface ChatInputProps {
   typingUsers?: { id: string; name: string }[];
   replyingTo?: Message | null;
   onCancelReply?: () => void;
+  editingMessage?: Message | null;
+  onCancelEdit?: () => void;
+  onSaveEdit?: (id: string, text: string) => void;
+}
+
+/**
+ * Parses and renders inline markdown tokens character-for-character so that
+ * when layered under the transparent textarea, the user is typing directly
+ * into the actively formatted markdown preview.
+ */
+function renderInlineSpans(text: string, keyPrefix: string): React.ReactNode[] {
+  const inlineRegex =
+    /(`[^`\n]+`)|(\*\*[^*\n]+\*\*|__[^_\n]+__)|(\*[^*\n]+\*|_[^_\n]+_)|(~~[^~\n]+~~)|(\[([^\]\n]+)\]\(([^)\s]+)\))/g;
+
+  const elements: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let spanIdx = 0;
+
+  while ((match = inlineRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      elements.push(text.slice(lastIndex, match.index));
+    }
+
+    const [full, code, bold, italic, strike, link, linkText, linkUrl] = match;
+
+    if (code) {
+      const inner = code.slice(1, -1);
+      elements.push(
+        <span key={`${keyPrefix}-${spanIdx++}`} className="md-preview-code">
+          <span className="md-preview-marker">`</span>
+          {inner}
+          <span className="md-preview-marker">`</span>
+        </span>
+      );
+    } else if (bold) {
+      const marker = bold.slice(0, 2);
+      const inner = bold.slice(2, -2);
+      elements.push(
+        <strong key={`${keyPrefix}-${spanIdx++}`} className="md-preview-bold">
+          <span className="md-preview-marker">{marker}</span>
+          {inner}
+          <span className="md-preview-marker">{marker}</span>
+        </strong>
+      );
+    } else if (italic) {
+      const marker = italic.slice(0, 1);
+      const inner = italic.slice(1, -1);
+      elements.push(
+        <em key={`${keyPrefix}-${spanIdx++}`} className="md-preview-italic">
+          <span className="md-preview-marker">{marker}</span>
+          {inner}
+          <span className="md-preview-marker">{marker}</span>
+        </em>
+      );
+    } else if (strike) {
+      const inner = strike.slice(2, -2);
+      elements.push(
+        <del key={`${keyPrefix}-${spanIdx++}`} className="md-preview-strike">
+          <span className="md-preview-marker">~~</span>
+          {inner}
+          <span className="md-preview-marker">~~</span>
+        </del>
+      );
+    } else if (link) {
+      elements.push(
+        <span key={`${keyPrefix}-${spanIdx++}`} className="md-preview-link">
+          <span className="md-preview-marker">[</span>
+          {linkText}
+          <span className="md-preview-marker">]({linkUrl})</span>
+        </span>
+      );
+    } else {
+      elements.push(full);
+    }
+
+    lastIndex = inlineRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    elements.push(text.slice(lastIndex));
+  }
+
+  return elements;
+}
+
+function renderInlineMarkdownPreview(rawText: string): React.ReactNode {
+  if (!rawText) return null;
+
+  const lines = rawText.split("\n");
+  let inCodeBlock = false;
+
+  return lines.map((line, lineIdx) => {
+    const isLastLine = lineIdx === lines.length - 1;
+
+    if (line.trim().startsWith("```")) {
+      inCodeBlock = !inCodeBlock;
+      return (
+        <React.Fragment key={lineIdx}>
+          <span className="md-preview-fence">{line}</span>
+          {!isLastLine && "\n"}
+        </React.Fragment>
+      );
+    }
+
+    if (inCodeBlock) {
+      return (
+        <React.Fragment key={lineIdx}>
+          <span className="md-preview-code-line">{line}</span>
+          {!isLastLine && "\n"}
+        </React.Fragment>
+      );
+    }
+
+    // Header check at line start (# Heading)
+    const headerMatch = line.match(/^(#{1,6}\s+)(.*)$/);
+    if (headerMatch) {
+      const [, hashPrefix, content] = headerMatch;
+      return (
+        <React.Fragment key={lineIdx}>
+          <span className="md-preview-header">
+            <span className="md-preview-marker">{hashPrefix}</span>
+            {renderInlineSpans(content, `h-${lineIdx}`)}
+          </span>
+          {!isLastLine && "\n"}
+        </React.Fragment>
+      );
+    }
+
+    // Quote check at line start (> Quote)
+    const quoteMatch = line.match(/^(>\s*)(.*)$/);
+    if (quoteMatch) {
+      const [, quotePrefix, content] = quoteMatch;
+      return (
+        <React.Fragment key={lineIdx}>
+          <span className="md-preview-quote">
+            <span className="md-preview-marker">{quotePrefix}</span>
+            {renderInlineSpans(content, `q-${lineIdx}`)}
+          </span>
+          {!isLastLine && "\n"}
+        </React.Fragment>
+      );
+    }
+
+    return (
+      <React.Fragment key={lineIdx}>
+        {renderInlineSpans(line, `l-${lineIdx}`)}
+        {!isLastLine && "\n"}
+      </React.Fragment>
+    );
+  });
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -35,6 +187,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   typingUsers = [],
   replyingTo = null,
   onCancelReply,
+  editingMessage = null,
+  onCancelEdit,
+  onSaveEdit,
 }) => {
   const [text, setText] = useState("");
   const [pendingImage, setPendingImage] = useState<string | null>(null);
@@ -44,8 +199,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewUnderlayRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<number | null>(null);
 
+  // Focus textarea when connected or reply/edit starts
   useEffect(() => {
     if (!disabled && textareaRef.current) {
       textareaRef.current.focus();
@@ -57,6 +214,37 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       textareaRef.current.focus();
     }
   }, [replyingTo]);
+
+  // When editingMessage changes, load its text into the input bar and focus
+  useEffect(() => {
+    if (editingMessage) {
+      setText(editingMessage.text || "");
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const len = (editingMessage.text || "").length;
+        textareaRef.current.setSelectionRange(len, len);
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 160)}px`;
+      }
+    }
+  }, [editingMessage]);
+
+  // Check if current text contains any markdown tokens
+  const hasMarkdown = useMemo(() => {
+    return /([*_`~#>[\]]|```)/.test(text);
+  }, [text]);
+
+  const renderedPreviewTokens = useMemo(() => {
+    if (!hasMarkdown) return null;
+    return renderInlineMarkdownPreview(text);
+  }, [text, hasMarkdown]);
+
+  const handleScroll = () => {
+    if (textareaRef.current && previewUnderlayRef.current) {
+      previewUnderlayRef.current.scrollTop = textareaRef.current.scrollTop;
+      previewUnderlayRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -80,6 +268,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const handleSend = () => {
     const cleanText = text.trim();
     if (!cleanText && !pendingImage) return;
+
+    // If editing a message, save the edit
+    if (editingMessage && onSaveEdit) {
+      if (cleanText && cleanText !== editingMessage.text) {
+        onSaveEdit(editingMessage.id, cleanText);
+      }
+      setText("");
+      if (onCancelEdit) onCancelEdit();
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+      return;
+    }
 
     let replyRef: ReplyReference | undefined;
     if (replyingTo) {
@@ -130,6 +331,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       if (showGifPicker) {
         e.preventDefault();
         setShowGifPicker(false);
+        return;
+      }
+      if (editingMessage && onCancelEdit) {
+        e.preventDefault();
+        setText("");
+        onCancelEdit();
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+        }
         return;
       }
       if (replyingTo && onCancelReply) {
@@ -197,7 +407,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div className="chat-input-container">
-      {/* 1. Dedicated Reserved Typing Indicator Row (Zero Layout Shift) */}
+      {/* 1. Reserved Typing Indicator Row */}
       <div className="typing-indicator-reserved-row" aria-live="polite">
         {typingUsers.length > 0 && (
           <div className="typing-content-box">
@@ -243,7 +453,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       )}
 
-      {/* 3. Pending image thumbnail */}
+      {/* 3. Editing Message Banner */}
+      {editingMessage && (
+        <div className="editing-banner-flat">
+          <div className="editing-banner-left">
+            <Pencil size={13} className="text-accent" />
+            <span className="editing-banner-label">Editing message:</span>
+            <span className="editing-banner-snippet">
+              {editingMessage.text || "(Image/Attachment)"}
+            </span>
+          </div>
+          <div className="editing-banner-actions">
+            <span className="editing-banner-hint">Esc to cancel</span>
+            <button
+              type="button"
+              className="editing-banner-close-btn"
+              onClick={() => {
+                setText("");
+                if (onCancelEdit) onCancelEdit();
+              }}
+              title="Cancel editing (Esc)"
+              aria-label="Cancel editing"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Pending image thumbnail */}
       {pendingImage && (
         <div className="pending-image-row">
           <div className="pending-image-chip">
@@ -303,19 +541,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       )}
 
-      {/* 4. Live Markdown Preview inside input box */}
-      {text.trim().length > 0 && /[*_`~#>[\]]/.test(text) && (
-        <div className="live-markdown-preview-pane" aria-label="Markdown live preview">
-          <div className="live-markdown-header">
-            <span className="live-markdown-tag">Live Markdown</span>
-          </div>
-          <div className="live-markdown-body">
-            <MarkdownRenderer content={text} />
-          </div>
-        </div>
-      )}
-
-      {/* 5. Compact Main Input Box */}
+      {/* 5. Main Input Box with Direct In-Place Active Markdown Preview */}
       <div className="chat-input-box">
         <input
           ref={fileInputRef}
@@ -366,28 +592,46 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </button>
         </div>
 
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          placeholder={replyingTo ? `Replying to ${replyingTo.userName}...` : "Send a message..."}
-          className="chat-input-textarea"
-          rows={1}
-          maxLength={2000}
-          disabled={disabled}
-          aria-label="Message input"
-        />
+        {/* In-box live markdown editor: transparent textarea overlaid on formatted preview underlay */}
+        <div className="chat-input-editor-wrapper">
+          <div
+            ref={previewUnderlayRef}
+            className={`chat-input-markdown-underlay ${hasMarkdown ? "visible" : ""}`}
+            aria-hidden="true"
+          >
+            {renderedPreviewTokens}
+          </div>
+
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onScroll={handleScroll}
+            placeholder={
+              editingMessage
+                ? "Edit your message... (Enter to save, Esc to cancel)"
+                : replyingTo
+                ? `Replying to ${replyingTo.userName}...`
+                : "Send a message... (Markdown supported)"
+            }
+            className={`chat-input-textarea ${hasMarkdown ? "has-markdown" : ""}`}
+            rows={1}
+            maxLength={2000}
+            disabled={disabled}
+            aria-label={editingMessage ? "Edit message" : "Message input"}
+          />
+        </div>
 
         <button
           type="button"
-          className="chat-send-accent-btn"
+          className={`chat-send-accent-btn ${editingMessage ? "is-editing" : ""}`}
           onClick={handleSend}
           disabled={disabled || (!text.trim() && !pendingImage)}
-          title="Send message (Enter)"
-          aria-label="Send message"
+          title={editingMessage ? "Save changes (Enter)" : "Send message (Enter)"}
+          aria-label={editingMessage ? "Save changes" : "Send message"}
         >
-          <Send size={15} />
+          {editingMessage ? <Check size={16} /> : <Send size={15} />}
         </button>
       </div>
     </div>

@@ -10,6 +10,8 @@ export type BackgroundType =
   | "starfield"
   | "constellation"
   | "aurora"
+  | "waves"
+  | "vortex"
   | "matrix"
   | "fireflies"
   | "retro-grid"
@@ -41,11 +43,15 @@ export interface BackgroundCustomConfig {
   charSet?: "matrix" | "binary" | "ascii";
   paletteMode?: "accent" | "custom";
   customColors?: string[];
+  contourDensity?: number; // Topographic density: 4 to 24
+  lineThickness?: number; // Topographic / grid stroke: 1 to 4
+  ribbonCount?: number; // Waves / ribbons: 2 to 8
 }
 
 export interface SettingsState {
   themeColor: string; // Default #facc15
   themeMode: ThemeMode;
+  backgroundColor: string; // Default #09090b
   background: BackgroundType;
   bgCustom: Record<BackgroundType, BackgroundCustomConfig>;
   messageStyle: MessageStyle;
@@ -68,6 +74,15 @@ export const THEME_PRESETS = [
   { name: "Teal", color: "#2dd4bf" },
 ];
 
+export const BG_BASE_COLORS = [
+  { name: "Deep Pitch", color: "#09090b" },
+  { name: "Midnight Navy", color: "#0b1120" },
+  { name: "Slate Abyss", color: "#0f172a" },
+  { name: "Dark Violet", color: "#13091f" },
+  { name: "Emerald Shadow", color: "#061a14" },
+  { name: "Crimson Eclipse", color: "#1a0808" },
+];
+
 export interface BackgroundMeta {
   id: BackgroundType;
   name: string;
@@ -87,14 +102,14 @@ export const BACKGROUND_LIST: BackgroundMeta[] = [
   {
     id: "blueprint-grid",
     name: "Blueprint Grid",
-    category: "simple",
-    description: "Subtle architectural coordinate grid.",
+    category: "animated",
+    description: "Architectural blueprint with animated scan beam and coordinate markers.",
   },
   {
     id: "telegram-doodle",
-    name: "Doodle Pattern",
-    category: "simple",
-    description: "Classic quiet chat pattern.",
+    name: "Doodle Wallpaper",
+    category: "animated",
+    description: "Hand-drawn paper planes, hearts, stars, and chat bubbles gently drifting.",
   },
   // Animated
   {
@@ -102,6 +117,20 @@ export const BACKGROUND_LIST: BackgroundMeta[] = [
     name: "Warp Starfield",
     category: "animated",
     description: "Perspective star streaks moving forward.",
+    heavy: false,
+  },
+  {
+    id: "waves",
+    name: "Neon Waves",
+    category: "animated",
+    description: "Harmonic mathematical sine waves with silk gradients.",
+    heavy: false,
+  },
+  {
+    id: "vortex",
+    name: "Particle Vortex",
+    category: "animated",
+    description: "Gravitational swirling vortex of luminous celestial particles.",
     heavy: false,
   },
   {
@@ -206,6 +235,27 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
     speed: 0.7,
     waveAmp: 45,
     waveFreq: 0.0025,
+    ribbonCount: 5,
+    verticalOffset: 0,
+  },
+  waves: {
+    dim: 0.3,
+    blur: 0,
+    brightness: 1.0,
+    contrast: 1.0,
+    speed: 0.7,
+    waveAmp: 42,
+    waveFreq: 0.003,
+    ribbonCount: 5,
+    verticalOffset: 0,
+  },
+  vortex: {
+    dim: 0.35,
+    blur: 0,
+    brightness: 1.0,
+    contrast: 1.0,
+    speed: 0.8,
+    particleCount: 130,
     verticalOffset: 0,
   },
   matrix: {
@@ -241,6 +291,10 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
     brightness: 1.0,
     contrast: 1.0,
     speed: 0.6,
+    contourDensity: 12,
+    waveAmp: 40,
+    waveFreq: 0.003,
+    lineThickness: 1.5,
     verticalOffset: 0,
   },
   "webgl-mesh": {
@@ -256,6 +310,7 @@ export const DEFAULT_BG_CONFIG: Record<BackgroundType, BackgroundCustomConfig> =
 export const DEFAULT_SETTINGS: SettingsState = {
   themeColor: "#facc15",
   themeMode: "dark",
+  backgroundColor: "#09090b",
   background: "starfield",
   bgCustom: DEFAULT_BG_CONFIG,
   messageStyle: "modern",
@@ -266,6 +321,35 @@ export const DEFAULT_SETTINGS: SettingsState = {
   notificationsEnabled: false,
   activeCategory: "appearance",
 };
+
+export function updateFavicon(accentColor: string) {
+  if (typeof document === "undefined") return;
+  const safeColor = accentColor || "#facc15";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#09090b" />
+  <rect width="64" height="64" rx="16" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" />
+  <path d="M22 24C16.477 24 12 28.477 12 34C12 39.523 16.477 44 22 44C27.523 44 32 39 32 34C32 29 36.477 24 42 24C47.523 24 52 28.477 52 34C52 39.523 47.523 44 42 44C36.477 44 32 39 32 34C32 29 27.523 24 22 24Z" 
+        stroke="${safeColor}" 
+        stroke-width="5" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        filter="url(#glow)" />
+</svg>`;
+  let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "icon";
+    document.head.appendChild(link);
+  }
+  link.type = "image/svg+xml";
+  link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
 
 export function getAccessibleTextColor(hexColor?: string): string {
   if (!hexColor || !hexColor.startsWith("#")) return "#09090b";
@@ -286,6 +370,7 @@ interface SettingsContextType {
   resetAllDefaults: () => void;
   clearAllData: () => void;
   THEME_PRESETS: typeof THEME_PRESETS;
+  BG_BASE_COLORS: typeof BG_BASE_COLORS;
   BACKGROUND_LIST: typeof BACKGROUND_LIST;
 }
 
@@ -348,6 +433,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       root.style.setProperty("--bg-brightness", String(currentBgConfig.brightness));
       root.style.setProperty("--bg-contrast", String(currentBgConfig.contrast));
     }
+
+    root.style.setProperty("--canvas-bg-color", settings.backgroundColor || "#09090b");
+    updateFavicon(settings.themeColor);
 
     try {
       localStorage.setItem("loopin_settings_v4", JSON.stringify(settings));
@@ -441,6 +529,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         resetAllDefaults,
         clearAllData,
         THEME_PRESETS,
+        BG_BASE_COLORS,
         BACKGROUND_LIST,
       }}
     >
@@ -461,6 +550,7 @@ export function useSettings() {
       resetAllDefaults: () => {},
       clearAllData: () => {},
       THEME_PRESETS,
+      BG_BASE_COLORS,
       BACKGROUND_LIST,
     };
   }

@@ -250,35 +250,6 @@ export class RoomDurableObject extends DurableObject {
             );
           } catch {}
 
-          // Prepend Welcome announcement on first join if room has no messages
-          if (this.messages.length === 0) {
-            const welcomeMsg: Message = {
-              id: "welcome-" + this.roomId,
-              roomId: this.roomId,
-              userId: "system",
-              userName: "System",
-              userColor: "#facc15",
-              text: `Welcome to #${this.roomId}! Messages are ephemeral and disappear when everyone leaves.`,
-              timestamp: Date.now() - 1,
-              isSystem: true,
-              status: "delivered",
-            };
-            this.messages.push(welcomeMsg);
-            try {
-              this.ctx.storage.sql.exec(
-                `INSERT INTO messages (id, roomId, userId, userName, userColor, text, timestamp, isSystem) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-                welcomeMsg.id,
-                welcomeMsg.roomId,
-                welcomeMsg.userId,
-                welcomeMsg.userName,
-                welcomeMsg.userColor,
-                welcomeMsg.text || "",
-                welcomeMsg.timestamp
-              );
-            } catch {}
-          }
-
           let joinMsg: Message | undefined;
 
           // Only generate announcement and broadcast join if the user was NOT already online in the room

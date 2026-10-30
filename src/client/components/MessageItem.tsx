@@ -21,7 +21,9 @@ interface MessageItemProps {
   showDelivered?: boolean;
   showSeen?: boolean;
   users?: User[];
-  onEdit: (id: string, newText: string) => void;
+  onEdit?: (id: string, newText: string) => void;
+  onStartEdit?: (message: Message) => void;
+  isBeingEdited?: boolean;
   onDelete: (id: string) => void;
   onReact: (id: string, emoji: string) => void;
   onExpandImage: (url: string) => void;
@@ -61,6 +63,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   showSeen = false,
   users = [],
   onEdit,
+  onStartEdit,
+  isBeingEdited = false,
   onDelete,
   onReact,
   onExpandImage,
@@ -68,12 +72,9 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onScrollToMessage,
   isTargetAvailable,
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(message.text || "");
   const [showEmojiMenu, setShowEmojiMenu] = useState(false);
   const [showReadersPopover, setShowReadersPopover] = useState(false);
 
-  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiMenuRef = useRef<HTMLDivElement>(null);
   const readersRef = useRef<HTMLDivElement>(null);
 
@@ -100,47 +101,6 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [showReadersPopover]);
-
-  // Auto-resize textarea seamlessly inside message bubble
-  useLayoutEffect(() => {
-    if (isEditing && editTextareaRef.current) {
-      editTextareaRef.current.focus();
-      // Select cursor at end
-      editTextareaRef.current.setSelectionRange(editText.length, editText.length);
-      editTextareaRef.current.style.height = "auto";
-      editTextareaRef.current.style.height = `${editTextareaRef.current.scrollHeight}px`;
-    }
-  }, [isEditing]);
-
-  const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditText(e.target.value);
-    e.target.style.height = "auto";
-    e.target.style.height = `${e.target.scrollHeight}px`;
-  };
-
-  const handleSaveEdit = () => {
-    const clean = editText.trim();
-    if (clean && clean !== message.text) {
-      onEdit(message.id, clean);
-    }
-    setIsEditing(false);
-  };
-
-  // Keyboard handling for inline editing: Enter saves, Escape cancels, Shift+Enter adds newline
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      // Modern IME-safety: prevent premature submission when converting characters
-      if (e.nativeEvent.isComposing || (e as any).keyCode === 229) {
-        return;
-      }
-      e.preventDefault();
-      handleSaveEdit();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      setIsEditing(false);
-      setEditText(message.text || "");
-    }
-  };
 
   const timeFormatted = new Date(message.timestamp).toLocaleTimeString([], {
     hour: "2-digit",
@@ -204,7 +164,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         )}
 
         {/* Message Bubble */}
-        <div className={`msg-bubble ${isMe ? "bubble-me" : "bubble-other"}`}>
+        <div className={`msg-bubble ${isMe ? "bubble-me" : "bubble-other"} ${isBeingEdited ? "msg-being-edited" : ""}`}>
           {/* Quoted Reply Preview */}
           {message.replyTo && (
             <div
@@ -250,159 +210,140 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             </div>
           )}
 
-          {/* Inline Edit or Content */}
-          {isEditing ? (
-            <div className="inline-edit-container">
-              <textarea
-                ref={editTextareaRef}
-                value={editText}
-                onChange={handleTextareaInput}
-                onKeyDown={handleKeyDown}
-                className="inline-edit-textarea"
-                rows={1}
-                maxLength={2000}
-                aria-label="Edit message"
-              />
-              <div className="inline-edit-buttons">
-                <button
-                  type="button"
-                  className="inline-edit-btn save-btn"
-                  onClick={handleSaveEdit}
-                  title="Save changes (Enter)"
-                >
-                  <Check size={12} />
-                  <span>Save</span>
-                </button>
-                <button
-                  type="button"
-                  className="inline-edit-btn cancel-btn"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setEditText(message.text || "");
-                  }}
-                  title="Cancel edit (Escape)"
-                >
-                  <X size={12} />
-                  <span>Cancel</span>
-                </button>
-              </div>
+          {/* Message Content */}
+          {message.text && (
+            <div className="msg-text">
+              <MarkdownRenderer content={message.text} />
             </div>
-          ) : (
-            <>
-              {message.text && (
-                <div className="msg-text">
-                  <MarkdownRenderer content={message.text} />
-                </div>
-              )}
-
-              {message.imageBase64 && (
-                <div
-                  className="msg-image-container"
-                  onClick={() => onExpandImage(message.imageBase64!)}
-                  title="Click to view full size"
-                >
-                  <img
-                    src={message.imageBase64}
-                    alt="Upload in chat"
-                    className="msg-image"
-                    loading="lazy"
-                  />
-                </div>
-              )}
-
-              {message.gifUrl && (
-                <div
-                  className="msg-gif-container"
-                  onClick={() => onExpandImage(message.gifUrl!)}
-                  title="Click to view full size"
-                >
-                  <img
-                    src={message.gifUrl}
-                    alt="GIF in chat"
-                    className="msg-gif"
-                    loading="lazy"
-                  />
-                </div>
-              )}
-
-              {message.editedAt && (
-                <span
-                  className="msg-edited-badge"
-                  title={`Edited at ${new Date(message.editedAt).toLocaleTimeString()}`}
-                >
-                  (edited)
-                </span>
-              )}
-            </>
           )}
 
+          {message.imageBase64 && (
+            <div
+              className="msg-image-container"
+              onClick={() => onExpandImage(message.imageBase64!)}
+              title="Click to view full size"
+            >
+              <img
+                src={message.imageBase64}
+                alt="Upload in chat"
+                className="msg-image"
+                loading="lazy"
+              />
+            </div>
+          )}
+
+          {message.gifUrl && (
+            <div
+              className="msg-gif-container"
+              onClick={() => onExpandImage(message.gifUrl!)}
+              title="Click to view full size"
+            >
+              <img
+                src={message.gifUrl}
+                alt="GIF in chat"
+                className="msg-gif"
+                loading="lazy"
+              />
+            </div>
+          )}
+
+          {/* Meta footer inside bubble: timestamp & edit badges */}
+          <div className="msg-meta-row">
+            {message.editedAt && (
+              <span
+                className="msg-edited-badge"
+                title={`Edited at ${new Date(message.editedAt).toLocaleTimeString()}`}
+              >
+                (edited)
+              </span>
+            )}
+            {isBeingEdited && (
+              <span className="msg-editing-pill" title="Currently editing this message in the input bar">
+                editing...
+              </span>
+            )}
+            <span className="msg-time">{timeFormatted}</span>
+            {isMe && (
+              <span className="msg-status-icon">
+                {showSeen ? (
+                  <CheckCheck size={12} className="text-accent" />
+                ) : showDelivered ? (
+                  <CheckCheck size={12} className="text-muted" />
+                ) : (
+                  <Check size={12} className="text-muted" />
+                )}
+              </span>
+            )}
+          </div>
+
           {/* Action Toolbar on hover */}
-          {!isEditing && (
-            <div className="msg-hover-toolbar">
-              {/* Reply Button */}
+          <div className="msg-hover-toolbar">
+            {/* Reply Button */}
+            <button
+              type="button"
+              className="hover-action-btn"
+              onClick={() => onReply(message)}
+              title="Reply to message"
+            >
+              <Reply size={13} />
+            </button>
+
+            {/* Reaction Trigger */}
+            <div className="reaction-trigger-wrap" ref={emojiMenuRef}>
               <button
                 type="button"
                 className="hover-action-btn"
-                onClick={() => onReply(message)}
-                title="Reply to message"
+                onClick={() => setShowEmojiMenu(!showEmojiMenu)}
+                title="Add reaction"
               >
-                <Reply size={13} />
+                <Smile size={14} />
               </button>
 
-              {/* Reaction Trigger */}
-              <div className="reaction-trigger-wrap" ref={emojiMenuRef}>
-                <button
-                  type="button"
-                  className="hover-action-btn"
-                  onClick={() => setShowEmojiMenu(!showEmojiMenu)}
-                  title="Add reaction"
-                >
-                  <Smile size={14} />
-                </button>
-
-                {showEmojiMenu && (
-                  <div className="quick-emoji-popover">
-                    {QUICK_EMOJIS.map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        className="quick-emoji-btn"
-                        onClick={() => {
-                          onReact(message.id, emoji);
-                          setShowEmojiMenu(false);
-                        }}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {isMe && (
-                <>
-                  {message.text && (
+              {showEmojiMenu && (
+                <div className="quick-emoji-popover">
+                  {QUICK_EMOJIS.map((emoji) => (
                     <button
+                      key={emoji}
                       type="button"
-                      className="hover-action-btn"
-                      onClick={() => setIsEditing(true)}
-                      title="Edit message"
+                      className="quick-emoji-btn"
+                      onClick={() => {
+                        onReact(message.id, emoji);
+                        setShowEmojiMenu(false);
+                      }}
                     >
-                      <Pencil size={13} />
+                      {emoji}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="hover-action-btn delete-btn"
-                    onClick={() => onDelete(message.id)}
-                    title="Delete message"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </>
+                  ))}
+                </div>
               )}
             </div>
-          )}
+
+            {isMe && (
+              <>
+                {message.text && (
+                  <button
+                    type="button"
+                    className="hover-action-btn"
+                    onClick={() => {
+                      if (onStartEdit) onStartEdit(message);
+                      else if (onEdit) onEdit(message.id, message.text || "");
+                    }}
+                    title="Edit message"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="hover-action-btn delete-btn"
+                  onClick={() => onDelete(message.id)}
+                  title="Delete message"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Existing Reactions Pill List */}

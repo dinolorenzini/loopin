@@ -60,6 +60,12 @@ const LANGUAGE_ALIASES: Record<string, SupportedLang> = {
 const JS_TOKEN_REGEX =
   /(\/\/.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(\b(?:const|let|var|function|return|if|else|for|while|import|from|export|default|class|interface|type|async|await|new|try|catch|finally|throw|yield|switch|case|break|continue|typeof|instanceof|void|extends|implements)\b)|(\b(?:true|false|null|undefined|NaN)\b)|(\b\d+(?:\.\d+)?\b)|([{}()[\],;.:?+\-*/%!=<>|&^~])/g;
 
+const CPP_TOKEN_REGEX =
+  /(#\s*\w+.*$|\/\/.*$|\/\*[\s\S]*?\*\/)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(\b(?:int|float|double|char|void|bool|auto|long|short|unsigned|signed|size_t|uint32_t|int32_t|uint64_t|int64_t|std|string|vector|map|cout|cin|cerr|endl)\b)|(\b(?:if|else|for|while|do|switch|case|default|break|continue|return|goto|try|catch|throw|new|delete|sizeof|typedef|struct|class|union|enum|namespace|using|template|typename|public|private|protected|virtual|override|final|constexpr|const|static|inline|explicit|friend|operator)\b)|(\b(?:true|false|nullptr|NULL)\b)|(\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[fFulL]*\b)|([{}()[\],;.:?+\-*/%!=<>|&^~#])/g;
+
+const RUST_TOKEN_REGEX =
+  /(\/\/.*$|\/\*[\s\S]*?\*\/)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(\b(?:fn|let|mut|struct|enum|impl|trait|pub|use|mod|crate|return|if|else|match|loop|while|for|in|break|continue|type|const|static|async|await|unsafe|as|where)\b)|(\b(?:i8|i16|i32|i64|i128|isize|u8|u16|u32|u64|u128|usize|f32|f64|bool|char|str|String|Vec|Option|Result|Some|None|Ok|Err)\b)|(\b(?:true|false)\b)|(\b\d+(?:\.\d+)?\b)|([{}()[\],;.:?+\-*/%!=<>|&^~#])/g;
+
 const PY_TOKEN_REGEX =
   /(#.*$)|("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')|(\b(?:def|class|return|if|elif|else|for|while|import|from|as|try|except|finally|raise|with|lambda|yield|pass|break|continue|in|is|not|and|or|global|nonlocal|async|await)\b)|(\b(?:True|False|None)\b)|(\b\d+(?:\.\d+)?\b)|([{}()[\],;.:?+\-*/%!=<>|&^~])/g;
 
@@ -122,10 +128,14 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
     switch (normalizedLang) {
       case "javascript":
       case "typescript":
-      case "rust":
       case "go":
-      case "cpp":
         activeRegex = JS_TOKEN_REGEX;
+        break;
+      case "cpp":
+        activeRegex = CPP_TOKEN_REGEX;
+        break;
+      case "rust":
+        activeRegex = RUST_TOKEN_REGEX;
         break;
       case "python":
         activeRegex = PY_TOKEN_REGEX;
@@ -160,22 +170,77 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
           elements.push(line.slice(lastIndex, match.index));
         }
 
-        const [full, comment, str, keyword, bool, num, punct] = match;
+        let tokenClass = "";
+        const m = match;
 
-        if (comment) {
-          elements.push(<span key={match.index} className="tok-comment">{comment}</span>);
-        } else if (str) {
-          elements.push(<span key={match.index} className="tok-string">{str}</span>);
-        } else if (keyword) {
-          elements.push(<span key={match.index} className="tok-keyword">{keyword}</span>);
-        } else if (bool) {
-          elements.push(<span key={match.index} className="tok-boolean">{bool}</span>);
-        } else if (num) {
-          elements.push(<span key={match.index} className="tok-number">{num}</span>);
-        } else if (punct) {
-          elements.push(<span key={match.index} className="tok-punct">{punct}</span>);
+        if (normalizedLang === "cpp") {
+          const [, comment, str, type, kw, bool, num, punct] = m;
+          if (comment) tokenClass = "tok-comment";
+          else if (str) tokenClass = "tok-string";
+          else if (type) tokenClass = "tok-type";
+          else if (kw) tokenClass = "tok-keyword";
+          else if (bool) tokenClass = "tok-boolean";
+          else if (num) tokenClass = "tok-number";
+          else if (punct) tokenClass = "tok-punct";
+        } else if (normalizedLang === "rust") {
+          const [, comment, str, kw, type, bool, num, punct] = m;
+          if (comment) tokenClass = "tok-comment";
+          else if (str) tokenClass = "tok-string";
+          else if (kw) tokenClass = "tok-keyword";
+          else if (type) tokenClass = "tok-type";
+          else if (bool) tokenClass = "tok-boolean";
+          else if (num) tokenClass = "tok-number";
+          else if (punct) tokenClass = "tok-punct";
+        } else if (normalizedLang === "html") {
+          const [, comment, doctype, tag, attr, str, close, punct] = m;
+          if (comment) tokenClass = "tok-comment";
+          else if (doctype) tokenClass = "tok-keyword";
+          else if (tag || close) tokenClass = "tok-tag";
+          else if (attr) tokenClass = "tok-attr";
+          else if (str) tokenClass = "tok-string";
+          else if (punct) tokenClass = "tok-punct";
+        } else if (normalizedLang === "css") {
+          const [, comment, str, sel, prop, atRule, val, punct] = m;
+          if (comment) tokenClass = "tok-comment";
+          else if (str) tokenClass = "tok-string";
+          else if (sel || atRule) tokenClass = "tok-keyword";
+          else if (prop) tokenClass = "tok-type";
+          else if (val) tokenClass = "tok-number";
+          else if (punct) tokenClass = "tok-punct";
+        } else if (normalizedLang === "json") {
+          const [, key, str, bool, num, punct] = m;
+          if (key) tokenClass = "tok-type";
+          else if (str) tokenClass = "tok-string";
+          else if (bool) tokenClass = "tok-boolean";
+          else if (num) tokenClass = "tok-number";
+          else if (punct) tokenClass = "tok-punct";
+        } else if (normalizedLang === "bash") {
+          const [, comment, str, variable, cmd, num, punct] = m;
+          if (comment) tokenClass = "tok-comment";
+          else if (str) tokenClass = "tok-string";
+          else if (variable) tokenClass = "tok-type";
+          else if (cmd) tokenClass = "tok-keyword";
+          else if (num) tokenClass = "tok-number";
+          else if (punct) tokenClass = "tok-punct";
         } else {
-          elements.push(full);
+          // Default: JS, TS, Python, SQL, Go
+          const [, comment, str, kw, bool, num, punct] = m;
+          if (comment) tokenClass = "tok-comment";
+          else if (str) tokenClass = "tok-string";
+          else if (kw) tokenClass = "tok-keyword";
+          else if (bool) tokenClass = "tok-boolean";
+          else if (num) tokenClass = "tok-number";
+          else if (punct) tokenClass = "tok-punct";
+        }
+
+        if (tokenClass) {
+          elements.push(
+            <span key={match.index} className={tokenClass}>
+              {match[0]}
+            </span>
+          );
+        } else {
+          elements.push(match[0]);
         }
 
         lastIndex = activeRegex.lastIndex;

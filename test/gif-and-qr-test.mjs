@@ -1,4 +1,5 @@
 import assert from "node:assert";
+import jsQR from "jsqr";
 import { searchGifs } from "../src/server/gifs.ts";
 import { generateQrMatrix } from "../src/client/utils/qr.ts";
 
@@ -79,6 +80,44 @@ async function runGifAndQrTests() {
   const matrixLong = generateQrMatrix(longUrl);
   assert(matrixLong.length >= 29, `Longer URL must step up version (size >= 29, got ${matrixLong.length})`);
   console.log(`✓ Long URL correctly stepped up to Version ${((matrixLong.length - 17) / 4)} (${matrixLong.length}x${matrixLong.length})`);
+
+  // Step 6: End-to-End Real Scanner Verification with jsQR
+  console.log("\nStep 6: Testing real optical barcode decoder (jsQR)...");
+  function verifyScannable(url) {
+    const mat = generateQrMatrix(url);
+    const mN = mat.length;
+    const quiet = 4;
+    const total = mN + quiet * 2;
+    const scale = 4;
+    const width = total * scale;
+    const height = total * scale;
+    const rgba = new Uint8ClampedArray(width * height * 4);
+    rgba.fill(255);
+    for (let r = 0; r < mN; r++) {
+      for (let c = 0; c < mN; c++) {
+        if (mat[r][c]) {
+          for (let dy = 0; dy < scale; dy++) {
+            for (let dx = 0; dx < scale; dx++) {
+              const y = (r + quiet) * scale + dy;
+              const x = (c + quiet) * scale + dx;
+              const idx = (y * width + x) * 4;
+              rgba[idx] = 0;
+              rgba[idx + 1] = 0;
+              rgba[idx + 2] = 0;
+            }
+          }
+        }
+      }
+    }
+    const decoded = jsQR(rgba, width, height);
+    assert(decoded, `QR code for "${url}" must be decodable by barcode scanner`);
+    assert.strictEqual(decoded.data, url, `Decoded text must match source url: expected ${url}, got ${decoded.data}`);
+  }
+
+  verifyScannable("https://loopin.chat/swift-fox-42");
+  verifyScannable("https://loopin.chat/global");
+  verifyScannable(longUrl);
+  console.log("✓ Real barcode scanner (jsQR) successfully decoded all generated QR codes!");
 
   console.log("\n🎉 ALL GIF SEARCH & QR CODE TESTS PASSED SUCCESSFULLY!");
 }
