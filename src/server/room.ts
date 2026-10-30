@@ -169,7 +169,7 @@ export class RoomDurableObject extends DurableObject {
           const cleanName = user.name.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 16);
           if (!cleanName) return;
           user.name = cleanName;
-          user.isFocused = true;
+          user.isFocused = Boolean(data.user.isFocused);
           user.isOnline = true;
           user.lastActiveAt = Date.now();
 
@@ -586,6 +586,10 @@ export class RoomDurableObject extends DurableObject {
           for (const mid of data.messageIds) {
             const msg = this.messages.find((m) => m.id === mid);
             if (msg) {
+              // Senders cannot mark their own messages as read receipts
+              if (msg.userId === attachment.userId) {
+                continue;
+              }
               if (!msg.readBy) msg.readBy = [msg.userId];
               if (!msg.readBy.includes(attachment.userId)) {
                 msg.readBy.push(attachment.userId);
@@ -774,11 +778,31 @@ export class RoomDurableObject extends DurableObject {
 
   private getActiveUsersList(): User[] {
     const list: User[] = [];
+    const seenNames = new Set<string>();
+
+    // 1. Add all online users first
     for (const [userId, user] of this.users.entries()) {
       const sockets = this.userSockets.get(userId);
       const isOnline = Boolean(sockets && sockets.size > 0);
-      list.push({ ...user, isOnline });
+      if (isOnline) {
+        seenNames.add(user.name.toLowerCase());
+        list.push({ ...user, isOnline: true });
+      }
     }
+
+    // 2. Add offline users only if their name is not already online
+    for (const [userId, user] of this.users.entries()) {
+      const sockets = this.userSockets.get(userId);
+      const isOnline = Boolean(sockets && sockets.size > 0);
+      if (!isOnline) {
+        const lower = user.name.toLowerCase();
+        if (!seenNames.has(lower)) {
+          seenNames.add(lower);
+          list.push({ ...user, isOnline: false });
+        }
+      }
+    }
+
     return list;
   }
 

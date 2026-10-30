@@ -110,17 +110,45 @@ export const RoomView: React.FC<RoomViewProps> = ({
     });
   }, []);
 
-  // Mark incoming messages as read
-  useEffect(() => {
-    if (document.hidden) return;
+  // Mark incoming messages as read only when actively viewing and focused
+  const markVisibleAsRead = useCallback(() => {
+    if (typeof document === "undefined") return;
+    // If the window is tabbed out or unfocused, do NOT mark as read!
+    if (document.hidden || !document.hasFocus()) return;
+
     const unreadFromOthers = messages
-      .filter((m) => m.userId !== currentUser.id && (!m.readBy || !m.readBy.includes(currentUser.id)))
+      .filter(
+        (m) =>
+          m.userId !== currentUser.id &&
+          (!m.readBy || !m.readBy.includes(currentUser.id))
+      )
       .map((m) => m.id);
 
     if (unreadFromOthers.length > 0) {
       markAsRead(unreadFromOthers);
     }
   }, [messages, currentUser.id, markAsRead]);
+
+  // Check on message list change (only executes if window is focused)
+  useEffect(() => {
+    markVisibleAsRead();
+  }, [markVisibleAsRead]);
+
+  // When user switches back into this window/tab, mark unread messages as read
+  useEffect(() => {
+    const handleFocusOrVisible = () => {
+      setTimeout(() => {
+        markVisibleAsRead();
+      }, 60);
+    };
+
+    window.addEventListener("focus", handleFocusOrVisible);
+    document.addEventListener("visibilitychange", handleFocusOrVisible);
+    return () => {
+      window.removeEventListener("focus", handleFocusOrVisible);
+      document.removeEventListener("visibilitychange", handleFocusOrVisible);
+    };
+  }, [markVisibleAsRead]);
 
   // Initial and subsequent scroll handling (Chat starts pinned to bottom)
   const scrollToBottom = useCallback((instant = false) => {
@@ -280,7 +308,10 @@ export const RoomView: React.FC<RoomViewProps> = ({
                     const m = messages[i];
                     if (m.userId === currentUser.id && !m.isSystem) {
                       const hasOtherReaders = (m.readBy || []).some(
-                        (readerId) => readerId !== currentUser.id && users.some((u) => u.id === readerId)
+                        (readerId) =>
+                          readerId !== currentUser.id &&
+                          readerId !== m.userId &&
+                          users.some((u) => u.id === readerId)
                       );
                       if (hasOtherReaders && !latestSeenMyMsgId) {
                         latestSeenMyMsgId = m.id;

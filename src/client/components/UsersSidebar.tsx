@@ -40,15 +40,30 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Deduplicate members strictly by stable user ID
+  // Deduplicate members strictly: If an account is currently online, never show an offline ghost of the same user
   const uniqueMembers = useMemo(() => {
-    const map = new Map<string, User>();
+    const onlineMap = new Map<string, User>();
+    const offlineMap = new Map<string, User>();
+
     for (const u of users) {
-      if (u && u.id) {
-        map.set(u.id, u);
+      if (!u || !u.name) continue;
+      const key = u.name.trim().toLowerCase();
+      if (u.isOnline !== false) {
+        onlineMap.set(key, u);
+      } else {
+        const existing = offlineMap.get(key);
+        if (!existing || (u.lastActiveAt || 0) > (existing.lastActiveAt || 0)) {
+          offlineMap.set(key, u);
+        }
       }
     }
-    return Array.from(map.values());
+
+    // Filter out any offline records that match an active online user name
+    for (const onlineKey of onlineMap.keys()) {
+      offlineMap.delete(onlineKey);
+    }
+
+    return [...onlineMap.values(), ...offlineMap.values()];
   }, [users]);
 
   const onlineMembers = uniqueMembers.filter((u) => u.isOnline !== false);

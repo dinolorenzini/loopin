@@ -157,19 +157,23 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     );
   }
 
-  // Calculate readers (excluding author)
-  const rawReaderIds = (message.readBy || []).filter((id) => id !== message.userId);
-  const readerUsers: User[] = rawReaderIds.map((id) => {
-    const found = users.find((u) => u.id === id);
-    return (
-      found || {
-        id,
-        name: id === currentUserId ? "You" : "Member",
-        color: "#94a3b8",
-        joinedAt: 0,
-      }
-    );
-  });
+  // Calculate readers (strictly excluding author and current viewer)
+  const rawReaderIds = (message.readBy || []).filter(
+    (id) => id !== message.userId && id !== currentUserId
+  );
+  const readerUsers: User[] = rawReaderIds
+    .map((id) => {
+      const found = users.find((u) => u.id === id);
+      return (
+        found || {
+          id,
+          name: "Member",
+          color: "#94a3b8",
+          joinedAt: 0,
+        }
+      );
+    })
+    .filter((u) => u.id !== currentUserId);
 
   const isReplyAvailable =
     !message.replyTo || (isTargetAvailable ? isTargetAvailable(message.replyTo.id) : true);

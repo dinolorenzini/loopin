@@ -77,12 +77,13 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
       // Send join event with user profile
       try {
+        const hasFocus = typeof document !== "undefined" && !document.hidden && document.hasFocus();
         ws.send(
           JSON.stringify({
             type: "join",
             user: {
               ...currentUserRef.current,
-              isFocused: !document.hidden,
+              isFocused: hasFocus,
               lastActiveAt: Date.now(),
               isOnline: true,
             },
@@ -302,8 +303,8 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
     };
     window.addEventListener("online", handleOnline);
 
-    const handleVisibilityChange = () => {
-      const isFocused = !document.hidden;
+    const updateFocusState = () => {
+      const isFocused = typeof document !== "undefined" && !document.hidden && document.hasFocus();
       sendPacket({
         type: "focus_change",
         isFocused,
@@ -314,23 +315,16 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
       }
     };
 
+    const handleVisibilityChange = () => {
+      updateFocusState();
+    };
+
     const handleFocus = () => {
-      sendPacket({
-        type: "focus_change",
-        isFocused: true,
-        lastActiveAt: Date.now(),
-      });
-      if (socketRef.current?.readyState !== WebSocket.OPEN) {
-        connect();
-      }
+      updateFocusState();
     };
 
     const handleBlur = () => {
-      sendPacket({
-        type: "focus_change",
-        isFocused: false,
-        lastActiveAt: Date.now(),
-      });
+      updateFocusState();
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
