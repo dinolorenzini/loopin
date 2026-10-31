@@ -241,30 +241,30 @@ export const HomePage: React.FC<HomePageProps> = ({
               <p className="home-card-tagline">
                 Simple, fast, private ephemeral chats.
               </p>
-            </div>
 
-            {/* User profile row (no card background) */}
-            <div
-              className="home-profile-bar home-profile-bar-left"
-              onClick={() => {
-                setSettingsCategory("profile");
-                setIsSettingsOpen(true);
-              }}
-              role="button"
-              tabIndex={0}
-              title="Edit your display name & color"
-            >
-              <span
-                className="user-color-dot"
-                style={{ backgroundColor: currentUser.color || "var(--primary-accent)" }}
-              />
-              <div className="home-user-details">
-                <span className="home-user-label">Chatting as</span>
-                <span className="home-user-name" style={{ color: currentUser.color || "inherit" }}>
-                  {currentUser.name}
-                </span>
+              {/* User profile row (no card background, grouped at top) */}
+              <div
+                className="home-profile-bar home-profile-bar-left"
+                onClick={() => {
+                  setSettingsCategory("profile");
+                  setIsSettingsOpen(true);
+                }}
+                role="button"
+                tabIndex={0}
+                title="Edit your display name & color"
+              >
+                <span
+                  className="user-color-dot"
+                  style={{ backgroundColor: currentUser.color || "var(--primary-accent)" }}
+                />
+                <div className="home-user-details">
+                  <span className="home-user-label">Chatting as</span>
+                  <span className="home-user-name" style={{ color: currentUser.color || "inherit" }}>
+                    {currentUser.name}
+                  </span>
+                </div>
+                <span className="home-user-edit-link">Edit</span>
               </div>
-              <span className="home-user-edit-link">Edit</span>
             </div>
 
             <div className="home-card-left-footer">

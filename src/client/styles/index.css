@@ -2751,6 +2751,8 @@ dialog::backdrop {
   padding: 6px 0 !important;
   box-shadow: none !important;
   transition: opacity var(--transition-fast);
+  margin-top: 14px;
+  width: 100%;
 }
 
 .home-profile-bar-left:hover {
