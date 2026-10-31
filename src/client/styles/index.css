@@ -2612,7 +2612,7 @@ dialog::backdrop {
 
 .home-card-left {
   padding: var(--space-6);
-  background: rgba(18, 18, 20, 0.65);
+  background: transparent;
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -2743,6 +2743,27 @@ dialog::backdrop {
 .home-user-edit-link {
   font-size: 12px;
   color: var(--primary-accent);
+}
+
+.home-profile-bar-left {
+  background: transparent !important;
+  border: none !important;
+  padding: 6px 0 !important;
+  box-shadow: none !important;
+  transition: opacity var(--transition-fast);
+}
+
+.home-profile-bar-left:hover {
+  background: transparent !important;
+  opacity: 0.85;
+}
+
+.home-profile-bar-left .home-user-edit-link {
+  font-size: 11.5px;
+  color: var(--primary-accent);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--primary-accent) 12%, transparent);
 }
 
 .join-chat-box, .create-chat-box {
@@ -4573,6 +4594,56 @@ button:disabled {
 .peeking-floating-badge:hover {
   background: var(--surface-panel);
   border-color: var(--primary-accent);
+}
+
+/* Performance Mode Warning Banner on Background Settings Tab */
+.bg-performance-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.bg-performance-warning-icon-wrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bg-performance-warning-text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.bg-performance-warning-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-left: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f59e0b;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  display: inline;
+  transition: color var(--transition-fast);
+}
+
+.bg-performance-warning-link:hover {
+  color: #fbbf24;
 }
 
 /* ==========================================================================

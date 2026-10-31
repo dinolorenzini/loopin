@@ -383,6 +383,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* 2. BACKGROUND */}
             {activeTab === "background" && (
               <div className="settings-category-view">
+                {settings.performanceMode && (
+                  <div className="bg-performance-warning-banner" role="alert">
+                    <div className="bg-performance-warning-icon-wrap">
+                      <AlertTriangle size={16} />
+                    </div>
+                    <div className="bg-performance-warning-text">
+                      <span>Animated backgrounds will not animate while Performance Mode is enabled.</span>{" "}
+                      <button
+                        type="button"
+                        className="bg-performance-warning-link"
+                        onClick={() => updateSetting("performanceMode", false)}
+                      >
+                        Turn off Performance Mode
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Background Base Color */}
                 <div className="pane-section">
                   <div className="section-title-wrap">
