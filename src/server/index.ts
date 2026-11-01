@@ -23,7 +23,10 @@ function isOriginAllowed(origin: string | null): boolean {
       host === "127.0.0.1" ||
       host === "100.101.178.123" ||
       host === "loopin.peretas.live" ||
-      host.endsWith(".loopin.peretas.live")
+      host.endsWith(".loopin.peretas.live") ||
+      host.endsWith(".workers.dev") ||
+      host.endsWith(".pages.dev") ||
+      host.endsWith(".cloudflare.com")
     );
   } catch {
     return false;

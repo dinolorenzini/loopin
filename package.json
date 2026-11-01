@@ -9,6 +9,7 @@
     "build:client": "vite build",
     "dev": "wrangler dev",
     "build": "vite build",
+    "predeploy": "npm run build",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "node test/compliance-test.mjs && node --use-system-ca test/gif-and-qr-test.mjs",
