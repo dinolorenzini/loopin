@@ -9,11 +9,16 @@ import {
   Reply,
   Pencil,
   Check,
+  AlertTriangle,
+  ShieldCheck,
 } from "lucide-react";
 import { EmojiPicker } from "./EmojiPicker";
 import { GifPicker } from "./GifPicker";
 import { processImageToBase64 } from "../utils/image";
 import type { Message, ReplyReference } from "../../server/types";
+import { isCoppaChildMode } from "../hooks/useUser";
+import { useSettings } from "../hooks/useSettings";
+import { checkMessageCompliance } from "../utils/complianceGuard";
 
 interface ChatInputProps {
   onSendMessage: (payload: {
@@ -197,6 +202,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [piiAlert, setPiiAlert] = useState<string | null>(null);
+
+  const isChildMode = isCoppaChildMode();
+  const { settings } = useSettings();
+  const isFerpaMode = settings.ferpaMode;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -260,6 +270,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     e.target.style.height = "auto";
     e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
 
+    if (piiAlert) {
+      setPiiAlert(null);
+    }
+
     if (val.trim()) {
       onTyping(true);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -274,6 +288,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const handleSend = () => {
     const cleanText = text.trim();
     if (!cleanText && !pendingImage) return;
+
+    // Compliance Check (COPPA & FERPA)
+    if (cleanText) {
+      const compliance = checkMessageCompliance(cleanText, isChildMode, isFerpaMode);
+      if (!compliance.isSafe) {
+        if (isChildMode || (isFerpaMode && compliance.piiType === "ssn_id")) {
+          setPiiAlert(compliance.warning || "Personal info cannot be sent.");
+          return;
+        }
+      }
+    }
 
     // If editing a message, save the edit
     if (editingMessage && onSaveEdit) {
@@ -356,6 +381,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isChildMode) {
+      setPiiAlert("🛡️ COPPA Notice: Image uploads are disabled for child accounts.");
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -373,6 +402,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
+      if (isChildMode) return;
       const items = e.clipboardData?.items;
       if (!items) return;
 
@@ -547,6 +577,22 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       )}
 
+      {/* Compliance / PII Alert Banner */}
+      {piiAlert && (
+        <div className="compliance-input-alert">
+          <AlertTriangle size={14} className="text-danger" />
+          <span className="compliance-input-alert-text">{piiAlert}</span>
+          <button
+            type="button"
+            className="compliance-alert-dismiss"
+            onClick={() => setPiiAlert(null)}
+            aria-label="Dismiss alert"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
+
       {/* 5. Main Input Box with Direct In-Place Active Markdown Preview */}
       <div className="chat-input-box">
         <input
@@ -558,30 +604,34 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         />
 
         <div className="input-tools-left">
-          <button
-            type="button"
-            className="input-icon-btn"
-            onClick={() => fileInputRef.current?.click()}
-            title="Attach image"
-            aria-label="Attach image"
-            disabled={disabled || isProcessingImage}
-          >
-            {isProcessingImage ? <Loader2 size={16} className="spinner" /> : <ImageIcon size={16} />}
-          </button>
+          {!isChildMode && (
+            <button
+              type="button"
+              className="input-icon-btn"
+              onClick={() => fileInputRef.current?.click()}
+              title="Attach image"
+              aria-label="Attach image"
+              disabled={disabled || isProcessingImage}
+            >
+              {isProcessingImage ? <Loader2 size={16} className="spinner" /> : <ImageIcon size={16} />}
+            </button>
+          )}
 
-          <button
-            type="button"
-            className={`input-icon-btn ${showGifPicker ? "active" : ""}`}
-            onClick={() => {
-              setShowGifPicker(!showGifPicker);
-              setShowEmojiPicker(false);
-            }}
-            title="Insert GIF"
-            aria-label="Insert GIF"
-            disabled={disabled}
-          >
-            <Film size={16} />
-          </button>
+          {!isChildMode && !isFerpaMode && (
+            <button
+              type="button"
+              className={`input-icon-btn ${showGifPicker ? "active" : ""}`}
+              onClick={() => {
+                setShowGifPicker(!showGifPicker);
+                setShowEmojiPicker(false);
+              }}
+              title="Insert GIF"
+              aria-label="Insert GIF"
+              disabled={disabled}
+            >
+              <Film size={16} />
+            </button>
+          )}
 
           <button
             type="button"

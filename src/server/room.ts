@@ -370,6 +370,24 @@ export class RoomDurableObject extends DurableObject {
           const user = this.users.get(attachment.userId);
           if (!user) return;
 
+          // COPPA Under-13 Child Account Safeguard
+          if (user.complianceRole === "child") {
+            if (data.imageBase64) {
+              this.sendTo(ws, {
+                type: "error",
+                message: "Image uploads are restricted for child accounts under COPPA 16 CFR § 312.",
+              });
+              return;
+            }
+            if (data.gifUrl) {
+              this.sendTo(ws, {
+                type: "error",
+                message: "External media queries are restricted for child accounts under COPPA 16 CFR § 312.",
+              });
+              return;
+            }
+          }
+
           // Token Bucket Rate Limiting (max 8 burst, 2 msgs/sec steady state)
           if (!this.checkRateLimit(attachment.userId, 1)) {
             this.sendTo(ws, {
@@ -740,6 +758,16 @@ export class RoomDurableObject extends DurableObject {
             type: "users_sync",
             users: this.getActiveUsersList(),
           });
+          break;
+        }
+
+        case "report_content": {
+          const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+          if (!attachment?.userId) return;
+          const msg = this.messages.find((m) => m.id === data.messageId);
+          if (msg) {
+            msg.isReported = true;
+          }
           break;
         }
       }

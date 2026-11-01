@@ -7,6 +7,7 @@ export interface User {
   isFocused?: boolean;
   lastActiveAt?: number;
   isOnline?: boolean;
+  complianceRole?: "standard" | "child" | "student" | "educator";
 }
 
 export interface MessageReaction {
@@ -40,6 +41,7 @@ export interface Message {
   status?: "sending" | "delivered" | "read";
   readBy?: string[]; // userIds of users who have read this message
   isSystem?: boolean;
+  isReported?: boolean;
 }
 
 export type ClientMessage =
@@ -52,6 +54,7 @@ export type ClientMessage =
   | { type: "typing"; isTyping: boolean }
   | { type: "focus_change"; isFocused: boolean; lastActiveAt?: number }
   | { type: "ping" }
+  | { type: "report_content"; messageId: string; category: string; details?: string }
   | { type: "update_profile"; name?: string; color?: string; avatar?: string };
 
 export type ServerMessage =

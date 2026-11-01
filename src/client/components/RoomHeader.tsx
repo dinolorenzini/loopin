@@ -14,10 +14,13 @@ import {
   Settings,
   Maximize2,
   Minimize2,
+  ShieldCheck,
+  GraduationCap,
 } from "lucide-react";
 import type { User } from "../../server/types";
 import { useSettings } from "../hooks/useSettings";
 import { LoopinLogo } from "./LoopinLogo";
+import { isCoppaChildMode } from "../hooks/useUser";
 
 interface RoomHeaderProps {
   roomId: string;
@@ -119,6 +122,19 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
               >
                 <Share2 size={13} />
               </button>
+            )}
+
+            {isCoppaChildMode() && (
+              <span className="compliance-header-tag tag-coppa" title="Under-13 Child-Safe Mode Active (COPPA Compliant)">
+                <ShieldCheck size={12} />
+                <span>Child Safe</span>
+              </span>
+            )}
+            {settings.ferpaMode && (
+              <span className="compliance-header-tag tag-ferpa" title="Classroom Privacy Mode (FERPA 34 CFR § 99.31)">
+                <GraduationCap size={12} />
+                <span>FERPA Edu</span>
+              </span>
             )}
           </div>
         </div>

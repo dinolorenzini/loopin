@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { type ConsentPreferences, DEFAULT_CONSENT } from "../types/compliance";
 
 export type MessageStyle = "modern" | "spacious" | "inline";
 export type ThemeMode = "dark" | "light" | "system";
@@ -60,6 +61,7 @@ export interface SettingsState {
   performanceMode: boolean; // Chromebook & low-power mode
   soundMuted: boolean;
   notificationsEnabled: boolean;
+  ferpaMode: boolean; // FERPA (34 CFR Part 99) student privacy mode
   activeCategory: SettingsCategory;
 }
 
@@ -320,6 +322,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   performanceMode: true, // First launch automatically starts in performance mode
   soundMuted: false,
   notificationsEnabled: false,
+  ferpaMode: false,
   activeCategory: "appearance",
 };
 
@@ -370,6 +373,10 @@ interface SettingsContextType {
   randomizeBgCustom: (bgId: BackgroundType) => void;
   resetAllDefaults: () => void;
   clearAllData: () => void;
+  consent: ConsentPreferences;
+  saveConsent: (preferences: Partial<ConsentPreferences>) => void;
+  revokeConsent: () => void;
+  exportAllUserData: () => void;
   THEME_PRESETS: typeof THEME_PRESETS;
   BG_BASE_COLORS: typeof BG_BASE_COLORS;
   BACKGROUND_LIST: typeof BACKGROUND_LIST;
@@ -511,10 +518,96 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch {}
   }, []);
 
+  const [consent, setConsent] = useState<ConsentPreferences>(() => {
+    if (typeof window === "undefined") return DEFAULT_CONSENT;
+    try {
+      const stored = localStorage.getItem("loopin_consent_v1");
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return { ...DEFAULT_CONSENT, timestamp: 0 };
+  });
+
+  const saveConsent = useCallback((preferences: Partial<ConsentPreferences>) => {
+    setConsent((prev) => {
+      const updated: ConsentPreferences = {
+        ...prev,
+        ...preferences,
+        necessary: true,
+        timestamp: Date.now(),
+        version: "2026.1",
+      };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("loopin_consent_v1", JSON.stringify(updated));
+          if (!updated.history) {
+            localStorage.removeItem("loopin_recent_rooms");
+          }
+        } catch {}
+      }
+      return updated;
+    });
+  }, []);
+
+  const revokeConsent = useCallback(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("loopin_consent_v1");
+      } catch {}
+    }
+    setConsent({ ...DEFAULT_CONSENT, timestamp: 0 });
+  }, []);
+
+  const exportAllUserData = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const exportPayload = {
+        application: "Loopin",
+        exportedAt: new Date().toISOString(),
+        gdprNotice: "Export generated under GDPR Article 20 & CCPA right to data portability.",
+        clientIdentity: {
+          id: sessionStorage.getItem("loopin_tab_user_id") || "ephemeral",
+          name: localStorage.getItem("loopin_user_name") || "Guest",
+          color: localStorage.getItem("loopin_user_color") || "#facc15",
+          ageBracket: localStorage.getItem("loopin_age_bracket") || "unspecified",
+          coppaChildMode: localStorage.getItem("loopin_coppa_mode") === "true",
+          ferpaEduMode: settings.ferpaMode,
+        },
+        consentRecord: consent,
+        userPreferences: settings,
+        recentRooms: (() => {
+          try {
+            return JSON.parse(localStorage.getItem("loopin_recent_rooms") || "[]");
+          } catch {
+            return [];
+          }
+        })(),
+        ephemeralSessionNotice:
+          "Chat messages exist exclusively in volatile edge RAM during active room connections and are purged automatically upon exit.",
+      };
+
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `loopin-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export user data:", err);
+    }
+  }, [settings, consent]);
+
   const clearAllData = useCallback(() => {
     try {
       localStorage.clear();
       sessionStorage.clear();
+
+      // Trigger server-side Clear-Site-Data header
+      try {
+        fetch("/api/compliance/clear-site-data", { method: "POST" }).catch(() => {});
+      } catch {}
 
       // Explicitly purge all known keys to ensure full wipe regardless of storage engine
       const keysToPurge = [
@@ -524,6 +617,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         "loopin_user_name",
         "loopin_user_color",
         "loopin_tab_user_id",
+        "loopin_consent_v1",
+        "loopin_age_bracket",
+        "loopin_coppa_mode",
+        "loopin_ferpa_mode",
         "loopin_settings_v4",
         "loopin_settings_v3",
         "loopin_settings_v2",
@@ -564,6 +661,10 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         randomizeBgCustom,
         resetAllDefaults,
         clearAllData,
+        consent,
+        saveConsent,
+        revokeConsent,
+        exportAllUserData,
         THEME_PRESETS,
         BG_BASE_COLORS,
         BACKGROUND_LIST,
@@ -585,6 +686,10 @@ export function useSettings() {
       randomizeBgCustom: () => {},
       resetAllDefaults: () => {},
       clearAllData: () => {},
+      consent: DEFAULT_CONSENT,
+      saveConsent: () => {},
+      revokeConsent: () => {},
+      exportAllUserData: () => {},
       THEME_PRESETS,
       BG_BASE_COLORS,
       BACKGROUND_LIST,

@@ -16,6 +16,7 @@ import { SettingsModal } from "./SettingsModal";
 import { ShareModal } from "./ShareModal";
 import { ImageLightbox } from "./ImageLightbox";
 import { NameConflictModal } from "./NameConflictModal";
+import { ReportModal } from "./ReportModal";
 import { ChatBackground } from "./ChatBackground";
 import { processImageToBase64 } from "../utils/image";
 import type { User, Message } from "../../server/types";
@@ -45,6 +46,8 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [reportingMessage, setReportingMessage] = useState<Message | null>(null);
+  const [hiddenMessageIds, setHiddenMessageIds] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -308,8 +311,10 @@ export const RoomView: React.FC<RoomViewProps> = ({
                   let latestSeenMyMsgId: string | null = null;
                   let latestDeliveredOnlyMyMsgId: string | null = null;
 
-                  for (let i = messages.length - 1; i >= 0; i--) {
-                    const m = messages[i];
+                  const visibleMessages = messages.filter((m) => !hiddenMessageIds.has(m.id));
+
+                  for (let i = visibleMessages.length - 1; i >= 0; i--) {
+                    const m = visibleMessages[i];
                     if (m.userId === currentUser.id && !m.isSystem) {
                       const hasOtherReaders = (m.readBy || []).some(
                         (readerId) =>
@@ -326,9 +331,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
                     }
                   }
 
-                  return messages.map((msg, index) => {
-                    const prev = messages[index - 1];
-                    const next = messages[index + 1];
+                  return visibleMessages.map((msg, index) => {
+                    const prev = visibleMessages[index - 1];
+                    const next = visibleMessages[index + 1];
                     const isMe = msg.userId === currentUser.id;
 
                     // Sequential clustering: 5 min window
@@ -370,6 +375,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
                         onReply={(targetMsg) => {
                           setEditingMessage(null);
                           setReplyingTo(targetMsg);
+                        }}
+                        onReport={(targetMsg) => {
+                          setReportingMessage(targetMsg);
                         }}
                         onScrollToMessage={scrollToMessage}
                         isTargetAvailable={isTargetAvailable}
@@ -441,6 +449,15 @@ export const RoomView: React.FC<RoomViewProps> = ({
       <ImageLightbox
         imageUrl={lightboxImage}
         onClose={() => setLightboxImage(null)}
+      />
+
+      <ReportModal
+        isOpen={Boolean(reportingMessage)}
+        message={reportingMessage}
+        onClose={() => setReportingMessage(null)}
+        onReportSubmitted={(msgId) => {
+          setHiddenMessageIds((prev) => new Set(prev).add(msgId));
+        }}
       />
 
       <NameConflictModal

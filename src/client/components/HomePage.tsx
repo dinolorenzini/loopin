@@ -277,9 +277,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                   setIsLegalOpen(true);
                 }}
               >
-                Terms of Service
+                Terms
               </button>
-              <span> and </span>
+              <span>, </span>
               <button
                 type="button"
                 className="home-legal-link"
@@ -288,7 +288,29 @@ export const HomePage: React.FC<HomePageProps> = ({
                   setIsLegalOpen(true);
                 }}
               >
-                Privacy Policy
+                Privacy (GDPR)
+              </button>
+              <span>, </span>
+              <button
+                type="button"
+                className="home-legal-link"
+                onClick={() => {
+                  setLegalDoc("ferpa");
+                  setIsLegalOpen(true);
+                }}
+              >
+                FERPA
+              </button>
+              <span>, &amp; </span>
+              <button
+                type="button"
+                className="home-legal-link"
+                onClick={() => {
+                  setLegalDoc("coppa");
+                  setIsLegalOpen(true);
+                }}
+              >
+                COPPA
               </button>
               <span>.</span>
             </div>

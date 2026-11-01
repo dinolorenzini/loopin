@@ -3,10 +3,14 @@ import { HomePage } from "./components/HomePage";
 import { RoomView } from "./components/RoomView";
 import { useUser, isUserOnboarded } from "./hooks/useUser";
 import { OnboardingModal } from "./components/OnboardingModal";
+import { ConsentBanner } from "./components/ConsentBanner";
+import { LegalModal, type LegalDocType } from "./components/LegalModal";
 
 export const App: React.FC = () => {
   const { user, updateUser } = useUser();
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(() => !isUserOnboarded());
+  const [isLegalOpen, setIsLegalOpen] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDocType>("privacy");
   const [currentRoom, setCurrentRoom] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     const path = window.location.pathname.replace(/^\/+|\/+$/g, "");
@@ -60,6 +64,19 @@ export const App: React.FC = () => {
         currentUser={user}
         onSave={updateUser}
         onComplete={() => setIsOnboardingOpen(false)}
+      />
+
+      <ConsentBanner
+        onOpenPrivacyPolicy={() => {
+          setLegalDoc("privacy");
+          setIsLegalOpen(true);
+        }}
+      />
+
+      <LegalModal
+        isOpen={isLegalOpen}
+        onClose={() => setIsLegalOpen(false)}
+        initialDoc={legalDoc}
       />
     </div>
   );
