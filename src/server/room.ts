@@ -15,6 +15,9 @@ export class RoomDurableObject extends DurableObject {
   private typingUsers: Map<string, number> = new Map();
   private userLimiters: Map<string, TokenBucketRateLimiter> = new Map();
   private dbInitialized: boolean = false;
+  private ownerId: string | null = null;
+  private isLocked: boolean = false;
+  private pendingRequests: Map<string, { user: User; ws: WebSocket; requestedAt: number }> = new Map();
 
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
@@ -116,6 +119,142 @@ export class RoomDurableObject extends DurableObject {
     };
   }
 
+  private getPendingRequestsList() {
+    return Array.from(this.pendingRequests.values()).map((p) => ({
+      id: p.user.id,
+      name: p.user.name,
+      color: p.user.color,
+      timestamp: p.requestedAt,
+    }));
+  }
+
+  private sendToOwner(message: ServerMessage): void {
+    if (!this.ownerId) return;
+    const sockets = this.userSockets.get(this.ownerId);
+    if (sockets) {
+      for (const ws of sockets) {
+        this.sendTo(ws, message);
+      }
+    }
+  }
+
+  private completeUserJoin(ws: WebSocket, user: User): void {
+    user.isOnline = true;
+    user.lastActiveAt = Date.now();
+    user.isOwner = (user.id === this.ownerId);
+
+    const attachment: SocketAttachment = {
+      userId: user.id,
+      roomId: this.roomId,
+    };
+    ws.serializeAttachment(attachment);
+
+    let sockets = this.userSockets.get(user.id);
+    const wasAlreadyOnline = Boolean(sockets && sockets.size > 0 && this.users.get(user.id)?.isOnline);
+    if (!sockets) {
+      sockets = new Set();
+      this.userSockets.set(user.id, sockets);
+    }
+    sockets.add(ws);
+
+    this.users.set(user.id, user);
+
+    try {
+      this.ctx.storage.sql.exec(
+        `INSERT INTO users (id, name, color, joinedAt, isFocused, lastActiveAt) 
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET 
+           name=excluded.name, 
+           color=excluded.color, 
+           isFocused=excluded.isFocused, 
+           lastActiveAt=excluded.lastActiveAt`,
+        user.id,
+        user.name,
+        user.color || "#facc15",
+        user.joinedAt || Date.now(),
+        1,
+        user.lastActiveAt
+      );
+    } catch {}
+
+    let joinMsg: Message | undefined;
+    if (!wasAlreadyOnline) {
+      joinMsg = {
+        id: crypto.randomUUID(),
+        roomId: this.roomId,
+        userId: "system",
+        userName: "System",
+        userColor: "#facc15",
+        text: user.isOwner ? `👑 ${user.name} joined as host` : `${user.name} joined the room`,
+        timestamp: Date.now(),
+        isSystem: true,
+        status: "delivered",
+      };
+      this.messages.push(joinMsg);
+
+      try {
+        this.ctx.storage.sql.exec(
+          `INSERT INTO messages (id, roomId, userId, userName, userColor, text, timestamp, isSystem) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+          joinMsg.id,
+          joinMsg.roomId,
+          joinMsg.userId,
+          joinMsg.userName,
+          joinMsg.userColor,
+          joinMsg.text || "",
+          joinMsg.timestamp
+        );
+      } catch {}
+    }
+
+    const activeUsers = this.getActiveUsersList();
+
+    this.sendTo(ws, {
+      type: "init",
+      roomId: this.roomId,
+      messages: joinMsg ? this.messages.filter((m) => m.id !== joinMsg.id) : this.messages,
+      users: activeUsers,
+      selfId: user.id,
+      isOwner: user.id === this.ownerId,
+      ownerId: this.ownerId,
+      isLocked: this.isLocked,
+      pendingRequests: user.id === this.ownerId ? this.getPendingRequestsList() : undefined,
+    });
+
+    if (!wasAlreadyOnline) {
+      this.broadcast(
+        {
+          type: "user_joined",
+          user,
+        },
+        ws
+      );
+
+      if (joinMsg) {
+        this.broadcast(
+          {
+            type: "new_message",
+            message: joinMsg,
+          },
+          ws
+        );
+      }
+    } else {
+      this.broadcast(
+        {
+          type: "user_updated",
+          user,
+        },
+        ws
+      );
+    }
+
+    this.broadcast({
+      type: "users_sync",
+      users: activeUsers,
+    });
+  }
+
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const roomParam = url.searchParams.get("room")?.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 64);
@@ -212,122 +351,41 @@ export class RoomDurableObject extends DurableObject {
           user.name = cleanName;
           user.color = typeof user.color === "string" && /^#[0-9a-fA-F]{3,8}$/.test(user.color) ? user.color : "#facc15";
           user.isFocused = Boolean(data.user.isFocused);
-          user.isOnline = true;
-          user.lastActiveAt = Date.now();
 
-          const attachment: SocketAttachment = {
-            userId: user.id,
-            roomId: this.roomId,
-          };
-          ws.serializeAttachment(attachment);
-
-          let sockets = this.userSockets.get(user.id);
-          const wasAlreadyOnline = Boolean(sockets && sockets.size > 0 && this.users.get(user.id)?.isOnline);
-          if (!sockets) {
-            sockets = new Set();
-            this.userSockets.set(user.id, sockets);
+          // Establish or confirm Room Ownership
+          if (!this.ownerId || !this.users.has(this.ownerId) || !this.isUserOnline(this.ownerId)) {
+            this.ownerId = user.id;
           }
-          sockets.add(ws);
+          user.isOwner = (user.id === this.ownerId);
 
-          this.users.set(user.id, user);
-
-          // Save user to SQLite
-          try {
-            this.ctx.storage.sql.exec(
-              `INSERT INTO users (id, name, color, joinedAt, isFocused, lastActiveAt) 
-               VALUES (?, ?, ?, ?, ?, ?)
-               ON CONFLICT(id) DO UPDATE SET 
-                 name=excluded.name, 
-                 color=excluded.color, 
-                 isFocused=excluded.isFocused, 
-                 lastActiveAt=excluded.lastActiveAt`,
-              user.id,
-              user.name,
-              user.color || "#facc15",
-              user.joinedAt || Date.now(),
-              1,
-              user.lastActiveAt
-            );
-          } catch {}
-
-          let joinMsg: Message | undefined;
-
-          // Only generate announcement and broadcast join if the user was NOT already online in the room
-          // (Deduplication prevents clone entries and duplicate join announcements across reconnects & multiple tabs)
-          if (!wasAlreadyOnline) {
-            joinMsg = {
-              id: crypto.randomUUID(),
+          // If Room is Locked and user is NOT the owner and not already admitted/online
+          const isAlreadyOnline = Boolean(this.users.has(user.id) && this.users.get(user.id)?.isOnline);
+          if (this.isLocked && user.id !== this.ownerId && !isAlreadyOnline) {
+            this.pendingRequests.set(user.id, { user, ws, requestedAt: Date.now() });
+            const attachment: SocketAttachment = {
+              userId: user.id,
               roomId: this.roomId,
-              userId: "system",
-              userName: "System",
-              userColor: "#facc15",
-              text: `${user.name} joined the room`,
-              timestamp: Date.now(),
-              isSystem: true,
-              status: "delivered",
             };
-            this.messages.push(joinMsg);
+            ws.serializeAttachment(attachment);
 
-            try {
-              this.ctx.storage.sql.exec(
-                `INSERT INTO messages (id, roomId, userId, userName, userColor, text, timestamp, isSystem) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-                joinMsg.id,
-                joinMsg.roomId,
-                joinMsg.userId,
-                joinMsg.userName,
-                joinMsg.userColor,
-                joinMsg.text || "",
-                joinMsg.timestamp
-              );
-            } catch {}
+            this.sendTo(ws, {
+              type: "join_requested",
+              message: "This room is locked by the host. Waiting for host approval...",
+            });
+
+            this.sendToOwner({
+              type: "knock_request",
+              request: {
+                id: user.id,
+                name: user.name,
+                color: user.color,
+                timestamp: Date.now(),
+              },
+            });
+            return;
           }
 
-          const activeUsers = this.getActiveUsersList();
-
-          // Send initialization data to the newly joined client (excluding own join announcement)
-          this.sendTo(ws, {
-            type: "init",
-            roomId: this.roomId,
-            messages: joinMsg ? this.messages.filter((m) => m.id !== joinMsg.id) : this.messages,
-            users: activeUsers,
-            selfId: user.id,
-          });
-
-          // Broadcast user_joined or user_updated to all other clients
-          if (!wasAlreadyOnline) {
-            this.broadcast(
-              {
-                type: "user_joined",
-                user,
-              },
-              ws
-            );
-
-            if (joinMsg) {
-              this.broadcast(
-                {
-                  type: "new_message",
-                  message: joinMsg,
-                },
-                ws
-              );
-            }
-          } else {
-            this.broadcast(
-              {
-                type: "user_updated",
-                user,
-              },
-              ws
-            );
-          }
-
-          // Authoritative sync of current active members list across all clients
-          this.broadcast({
-            type: "users_sync",
-            users: activeUsers,
-          });
+          this.completeUserJoin(ws, user);
           break;
         }
 
@@ -770,6 +828,119 @@ export class RoomDurableObject extends DurableObject {
           }
           break;
         }
+
+        case "set_room_lock": {
+          const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+          if (!attachment?.userId || attachment.userId !== this.ownerId) return;
+
+          this.isLocked = Boolean(data.locked);
+          this.broadcast({
+            type: "room_lock_changed",
+            locked: this.isLocked,
+            ownerId: this.ownerId,
+          });
+
+          const lockNotice: Message = {
+            id: crypto.randomUUID(),
+            roomId: this.roomId,
+            userId: "system",
+            userName: "System",
+            userColor: "#facc15",
+            text: this.isLocked
+              ? "🔒 Host has locked the room. New members must request permission to enter."
+              : "🔓 Host has unlocked the room. Anyone with the link can join freely.",
+            timestamp: Date.now(),
+            isSystem: true,
+            status: "delivered",
+          };
+          this.messages.push(lockNotice);
+          this.broadcast({
+            type: "new_message",
+            message: lockNotice,
+          });
+          break;
+        }
+
+        case "approve_join": {
+          const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+          if (!attachment?.userId || attachment.userId !== this.ownerId) return;
+
+          const pending = this.pendingRequests.get(data.userId);
+          if (!pending) return;
+
+          this.pendingRequests.delete(data.userId);
+
+          // Complete the join process for the approved user
+          this.completeUserJoin(pending.ws, pending.user);
+
+          this.sendToOwner({
+            type: "knock_resolved",
+            userId: data.userId,
+            approved: true,
+          });
+          break;
+        }
+
+        case "deny_join": {
+          const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+          if (!attachment?.userId || attachment.userId !== this.ownerId) return;
+
+          const pending = this.pendingRequests.get(data.userId);
+          if (pending) {
+            this.sendTo(pending.ws, {
+              type: "join_denied",
+              message: "The host has declined your request to join this room.",
+            });
+            this.pendingRequests.delete(data.userId);
+          }
+
+          this.sendToOwner({
+            type: "knock_resolved",
+            userId: data.userId,
+            approved: false,
+          });
+          break;
+        }
+
+        case "kick_user": {
+          const attachment = ws.deserializeAttachment() as SocketAttachment | null;
+          if (!attachment?.userId || attachment.userId !== this.ownerId) return;
+          if (data.userId === this.ownerId) return;
+
+          const targetUser = this.users.get(data.userId);
+          if (targetUser) {
+            const sockets = this.userSockets.get(data.userId);
+            if (sockets) {
+              for (const s of sockets) {
+                this.sendTo(s, {
+                  type: "kicked",
+                  message: "You were removed from the room by the host.",
+                });
+                try {
+                  s.close(1008, "Removed by host");
+                } catch {}
+              }
+            }
+
+            const kickNotice: Message = {
+              id: crypto.randomUUID(),
+              roomId: this.roomId,
+              userId: "system",
+              userName: "System",
+              userColor: "#facc15",
+              text: `🚪 ${targetUser.name} was removed from the room by the host`,
+              timestamp: Date.now(),
+              isSystem: true,
+              status: "delivered",
+            };
+            this.messages.push(kickNotice);
+            this.broadcast({
+              type: "new_message",
+              message: kickNotice,
+            });
+          }
+          break;
+        }
       }
     } catch {
       // Privacy: silent ignore invalid packets, zero server trace logging
@@ -788,6 +959,8 @@ export class RoomDurableObject extends DurableObject {
     const attachment = ws.deserializeAttachment() as SocketAttachment | null;
     if (attachment?.userId) {
       const userId = attachment.userId;
+      this.pendingRequests.delete(userId);
+
       const sockets = this.userSockets.get(userId);
       if (sockets) {
         sockets.delete(ws);
@@ -836,6 +1009,39 @@ export class RoomDurableObject extends DurableObject {
               message: leaveMsg,
             });
 
+            // If the user who went offline was the owner, transfer ownership to the next active user
+            if (user.id === this.ownerId) {
+              const activeRemaining = this.getActiveUsersList().filter((u) => u.id !== user.id);
+              if (activeRemaining.length > 0) {
+                const nextOwner = activeRemaining[0];
+                this.ownerId = nextOwner.id;
+                nextOwner.isOwner = true;
+                this.users.set(nextOwner.id, nextOwner);
+                this.broadcast({
+                  type: "owner_changed",
+                  ownerId: this.ownerId,
+                });
+                const transferMsg: Message = {
+                  id: crypto.randomUUID(),
+                  roomId: this.roomId,
+                  userId: "system",
+                  userName: "System",
+                  userColor: "#facc15",
+                  text: `👑 ${nextOwner.name} is now the host of this room`,
+                  timestamp: Date.now(),
+                  isSystem: true,
+                  status: "delivered",
+                };
+                this.messages.push(transferMsg);
+                this.broadcast({
+                  type: "new_message",
+                  message: transferMsg,
+                });
+              } else {
+                this.ownerId = null;
+              }
+            }
+
             this.broadcast({
               type: "users_sync",
               users: this.getActiveUsersList(),
@@ -857,6 +1063,9 @@ export class RoomDurableObject extends DurableObject {
       this.userSockets.clear();
       this.typingUsers.clear();
       this.userLimiters.clear();
+      this.ownerId = null;
+      this.isLocked = false;
+      this.pendingRequests.clear();
       try {
         this.ctx.storage.sql.exec("DELETE FROM messages;");
         this.ctx.storage.sql.exec("DELETE FROM users;");

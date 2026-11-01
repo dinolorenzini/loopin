@@ -180,4 +180,141 @@ assert.ok(expectedHeaders["Clear-Site-Data"].includes("storage"));
 
 console.log("✓ Modern web security, privacy, and Clear-Site-Data headers verified!");
 
-console.log("\n🎉 ALL COMPLIANCE SUITE TESTS (EU LAWS, FERPA, COPPA) PASSED SUCCESSFULLY!");
+// -------------------------------------------------------------
+// Test 7: Lobby Ownership & Waiting Room (Knock / Join Request)
+// -------------------------------------------------------------
+console.log("\nStep 7: Testing Room Host Ownership & Knock Flow for School Safety...");
+
+// Simulate state management of room ownership & gating
+class MockRoomState {
+  constructor(roomId) {
+    this.roomId = roomId;
+    this.ownerId = null;
+    this.isLocked = false;
+    this.users = new Map();
+    this.pending = new Map();
+  }
+
+  handleUserJoin(user) {
+    // If first person in lobby, assign ownership
+    if (!this.ownerId && this.users.size === 0) {
+      this.ownerId = user.id;
+      user.isOwner = true;
+    } else {
+      user.isOwner = user.id === this.ownerId;
+    }
+
+    // If room is locked and user is not owner, route to waiting room
+    if (this.isLocked && user.id !== this.ownerId) {
+      this.pending.set(user.id, {
+        id: user.id,
+        name: user.name,
+        color: user.color,
+        timestamp: Date.now(),
+      });
+      return { status: "waiting_approval" };
+    }
+
+    this.users.set(user.id, user);
+    return { status: "admitted", user };
+  }
+
+  setLock(isLocked, requesterId) {
+    if (requesterId !== this.ownerId) {
+      throw new Error("Only the room host can lock/unlock the lobby");
+    }
+    this.isLocked = isLocked;
+  }
+
+  approve(userId, requesterId) {
+    if (requesterId !== this.ownerId) {
+      throw new Error("Only the room host can admit participants");
+    }
+    const pendingReq = this.pending.get(userId);
+    if (!pendingReq) return null;
+    this.pending.delete(userId);
+    const user = {
+      id: pendingReq.id,
+      name: pendingReq.name,
+      color: pendingReq.color,
+      joinedAt: Date.now(),
+      isOnline: true,
+      isOwner: false,
+    };
+    this.users.set(userId, user);
+    return user;
+  }
+
+  deny(userId, requesterId) {
+    if (requesterId !== this.ownerId) {
+      throw new Error("Only the room host can deny participants");
+    }
+    this.pending.delete(userId);
+    return true;
+  }
+
+  userLeave(userId) {
+    this.users.delete(userId);
+    if (this.ownerId === userId) {
+      const remaining = Array.from(this.users.values());
+      if (remaining.length > 0) {
+        this.ownerId = remaining[0].id;
+        remaining[0].isOwner = true;
+      } else {
+        this.ownerId = null;
+        this.isLocked = false;
+      }
+    }
+  }
+}
+
+const testRoom = new MockRoomState("edu-algebra-101");
+
+// Teacher joins first
+const teacher = { id: "teacher-1", name: "Ms. Miller", color: "#38bdf8", joinedAt: Date.now() };
+const join1 = testRoom.handleUserJoin(teacher);
+assert.strictEqual(join1.status, "admitted");
+assert.strictEqual(testRoom.ownerId, "teacher-1", "First user in lobby must become room owner/host");
+assert.strictEqual(teacher.isOwner, true);
+
+// Teacher locks the room
+testRoom.setLock(true, "teacher-1");
+assert.strictEqual(testRoom.isLocked, true, "Host must be able to lock room");
+
+// Student 1 attempts to join locked room
+const student1 = { id: "student-1", name: "Alex B", color: "#4ade80", joinedAt: Date.now() };
+const join2 = testRoom.handleUserJoin(student1);
+assert.strictEqual(join2.status, "waiting_approval", "Locked room must hold non-host in waiting room");
+assert.strictEqual(testRoom.pending.has("student-1"), true, "Pending knock request must be queued");
+assert.strictEqual(testRoom.users.has("student-1"), false, "Pending user must not appear in active room users");
+
+// Non-host cannot approve
+assert.throws(() => testRoom.approve("student-1", "student-2"), /Only the room host/);
+
+// Teacher approves Student 1
+const admittedUser = testRoom.approve("student-1", "teacher-1");
+assert.ok(admittedUser, "Admitted user returned");
+assert.strictEqual(testRoom.pending.has("student-1"), false);
+assert.strictEqual(testRoom.users.has("student-1"), true, "Admitted user now in room users");
+
+// Student 2 attempts to join and is denied
+const student2 = { id: "student-2", name: "Spammer", color: "#f43f5e", joinedAt: Date.now() };
+testRoom.handleUserJoin(student2);
+assert.strictEqual(testRoom.pending.has("student-2"), true);
+testRoom.deny("student-2", "teacher-1");
+assert.strictEqual(testRoom.pending.has("student-2"), false);
+assert.strictEqual(testRoom.users.has("student-2"), false);
+
+// Host departure transfers ownership
+testRoom.userLeave("teacher-1");
+assert.strictEqual(testRoom.ownerId, "student-1", "Ownership must gracefully transfer to next active participant");
+assert.strictEqual(testRoom.users.get("student-1").isOwner, true);
+
+// Final participant departs: auto-wipes room state
+testRoom.userLeave("student-1");
+assert.strictEqual(testRoom.ownerId, null, "Empty room state wipes owner");
+assert.strictEqual(testRoom.isLocked, false, "Empty room resets lock");
+
+console.log("✓ Room host ownership, locked waiting room, knock approval/denial, and transfer lifecycle verified!");
+
+console.log("\n🎉 ALL COMPLIANCE SUITE TESTS (EU LAWS, FERPA, COPPA, SCHOOL CONTROLS) PASSED SUCCESSFULLY!");

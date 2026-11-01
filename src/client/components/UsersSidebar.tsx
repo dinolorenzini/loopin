@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Users, X, Pin, PinOff } from "lucide-react";
+import { Users, X, Pin, PinOff, ShieldCheck, UserX } from "lucide-react";
 import type { User } from "../../server/types";
 
 interface UsersSidebarProps {
@@ -10,6 +10,9 @@ interface UsersSidebarProps {
   typingUsers: { id: string; name: string }[];
   isPinned: boolean;
   onTogglePin: () => void;
+  ownerId?: string | null;
+  isOwner?: boolean;
+  onKickUser?: (userId: string) => void;
 }
 
 function formatRelativeActivity(timestamp?: number): string {
@@ -32,6 +35,9 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
   typingUsers,
   isPinned,
   onTogglePin,
+  ownerId,
+  isOwner,
+  onKickUser,
 }) => {
   // Relative time ticker
   const [, setTick] = useState(0);
@@ -128,6 +134,7 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
             <div className="members-stack">
               {onlineMembers.map((u) => {
                 const isMe = u.id === currentUserId;
+                const isHost = u.id === ownerId || Boolean(u.isOwner);
                 const isTyping = typingUsers.some((t) => t.id === u.id);
                 const isFocused = u.isFocused !== false;
 
@@ -146,6 +153,11 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
                         >
                           {u.name}
                         </span>
+                        {isHost && (
+                          <span className="member-host-badge" title="Room Host / Creator">
+                            👑 Host
+                          </span>
+                        )}
                         {isMe && <span className="member-you-marker">(you)</span>}
                       </div>
 
@@ -159,6 +171,18 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
                         )}
                       </span>
                     </div>
+
+                    {isOwner && !isMe && onKickUser && (
+                      <button
+                        type="button"
+                        className="member-kick-btn"
+                        onClick={() => onKickUser(u.id)}
+                        title={`Remove ${u.name} from room`}
+                        aria-label={`Remove ${u.name} from room`}
+                      >
+                        <UserX size={13} />
+                      </button>
+                    )}
                   </div>
                 );
               })}

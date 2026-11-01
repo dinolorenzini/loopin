@@ -5,6 +5,7 @@ import { useUser, isUserOnboarded } from "./hooks/useUser";
 import { OnboardingModal } from "./components/OnboardingModal";
 import { ConsentBanner } from "./components/ConsentBanner";
 import { LegalModal, type LegalDocType } from "./components/LegalModal";
+import { SchoolsPage } from "./components/SchoolsPage";
 
 export const App: React.FC = () => {
   const { user, updateUser } = useUser();
@@ -42,9 +43,22 @@ export const App: React.FC = () => {
     document.title = "Loopin";
   }, []);
 
+  const navigateToSchools = useCallback(() => {
+    window.history.pushState({}, "", "/schools");
+    setCurrentRoom("schools");
+    document.title = "Loopin for Schools & Classrooms";
+  }, []);
+
+  const isSchoolsRoute = currentRoom === "schools" || currentRoom === "for-schools";
+
   return (
     <div className="app-root">
-      {currentRoom ? (
+      {isSchoolsRoute ? (
+        <SchoolsPage
+          onBack={navigateToHome}
+          onStartClassroom={(room) => navigateToRoom(room)}
+        />
+      ) : currentRoom ? (
         <RoomView
           roomId={currentRoom}
           currentUser={user}
@@ -56,6 +70,7 @@ export const App: React.FC = () => {
           onJoinRoom={navigateToRoom}
           currentUser={user}
           onUpdateUser={updateUser}
+          onOpenSchools={navigateToSchools}
         />
       )}
 

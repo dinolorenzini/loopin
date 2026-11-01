@@ -8,6 +8,14 @@ export interface User {
   lastActiveAt?: number;
   isOnline?: boolean;
   complianceRole?: "standard" | "child" | "student" | "educator";
+  isOwner?: boolean;
+}
+
+export interface PendingJoinRequest {
+  id: string;
+  name: string;
+  color: string;
+  timestamp: number;
 }
 
 export interface MessageReaction {
@@ -55,10 +63,24 @@ export type ClientMessage =
   | { type: "focus_change"; isFocused: boolean; lastActiveAt?: number }
   | { type: "ping" }
   | { type: "report_content"; messageId: string; category: string; details?: string }
+  | { type: "set_room_lock"; locked: boolean }
+  | { type: "approve_join"; userId: string }
+  | { type: "deny_join"; userId: string }
+  | { type: "kick_user"; userId: string }
   | { type: "update_profile"; name?: string; color?: string; avatar?: string };
 
 export type ServerMessage =
-  | { type: "init"; roomId: string; messages: Message[]; users: User[]; selfId: string }
+  | {
+      type: "init";
+      roomId: string;
+      messages: Message[];
+      users: User[];
+      selfId: string;
+      isOwner?: boolean;
+      ownerId?: string | null;
+      isLocked?: boolean;
+      pendingRequests?: PendingJoinRequest[];
+    }
   | { type: "users_sync"; users: User[] }
   | { type: "user_joined"; user: User }
   | { type: "user_left"; userId: string; userName: string }
@@ -71,5 +93,12 @@ export type ServerMessage =
   | { type: "messages_read"; messageIds: string[]; userId: string }
   | { type: "typing_status"; typingUsers: { id: string; name: string }[] }
   | { type: "name_taken"; name: string; suggestedName?: string; message: string }
+  | { type: "room_lock_changed"; locked: boolean; ownerId: string | null }
+  | { type: "owner_changed"; ownerId: string | null }
+  | { type: "join_requested"; message: string }
+  | { type: "join_denied"; message: string }
+  | { type: "knock_request"; request: PendingJoinRequest }
+  | { type: "knock_resolved"; userId: string; approved: boolean }
+  | { type: "kicked"; message: string }
   | { type: "pong" }
   | { type: "error"; message: string };
