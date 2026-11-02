@@ -1205,11 +1205,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           Suppresses external unvetted GIF queries, warns on student directory info leaks, and enforces student data isolation.
                         </span>
                       </div>
-                      <label className="switch-toggle" aria-label="Toggle FERPA Classroom Mode">
+                      <label className="switch-control" aria-label="Toggle FERPA Classroom Mode">
                         <input
                           type="checkbox"
                           checked={settings.ferpaMode}
                           onChange={(e) => updateSetting("ferpaMode", e.target.checked)}
+                          className="switch-checkbox"
                         />
                         <span className="switch-slider" />
                       </label>

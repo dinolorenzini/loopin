@@ -2299,7 +2299,8 @@ dialog::backdrop {
   color: var(--text-muted);
   max-width: 440px;
 }
-.switch-control {
+.switch-control,
+.switch-toggle {
   position: relative;
   display: inline-block;
   width: 40px;
