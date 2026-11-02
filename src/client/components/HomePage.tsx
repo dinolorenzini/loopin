@@ -7,6 +7,7 @@ import {
   Hash,
   AlertCircle,
   Globe,
+  GraduationCap,
 } from "lucide-react";
 import type { User } from "../../server/types";
 import { ChatBackground } from "./ChatBackground";
@@ -19,6 +20,7 @@ interface HomePageProps {
   onJoinRoom: (room: string) => void;
   currentUser: User;
   onUpdateUser: (updates: Partial<Pick<User, "name" | "color">>) => void;
+  onOpenSchools?: () => void;
 }
 
 interface RecentRoom {
@@ -100,6 +102,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onJoinRoom,
   currentUser,
   onUpdateUser,
+  onOpenSchools,
 }) => {
   const [roomInput, setRoomInput] = useState("");
   const [inputError, setInputError] = useState<string | null>(null);
@@ -206,6 +209,18 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
 
         <div className="home-top-bar-right">
+          {onOpenSchools && (
+            <button
+              type="button"
+              className="btn-schools-badge"
+              onClick={onOpenSchools}
+              title="Learn how Loopin is built for schools & student safety"
+            >
+              <GraduationCap size={15} className="text-accent" />
+              <span>For School Admins</span>
+            </button>
+          )}
+
           <button
             type="button"
             className="header-icon-btn"
@@ -268,6 +283,18 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
 
             <div className="home-card-left-footer">
+              {onOpenSchools && (
+                <div className="home-footer-schools-row">
+                  <button
+                    type="button"
+                    className="home-schools-footer-link"
+                    onClick={onOpenSchools}
+                  >
+                    <GraduationCap size={13} />
+                    <span>For School Admins &bull; Safe Student Collaboration Guide</span>
+                  </button>
+                </div>
+              )}
               <span>By continuing, you agree to our </span>
               <button
                 type="button"
@@ -277,9 +304,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                   setIsLegalOpen(true);
                 }}
               >
-                Terms of Service
+                Terms
               </button>
-              <span> and </span>
+              <span>, </span>
               <button
                 type="button"
                 className="home-legal-link"
@@ -288,7 +315,29 @@ export const HomePage: React.FC<HomePageProps> = ({
                   setIsLegalOpen(true);
                 }}
               >
-                Privacy Policy
+                Privacy (GDPR)
+              </button>
+              <span>, </span>
+              <button
+                type="button"
+                className="home-legal-link"
+                onClick={() => {
+                  setLegalDoc("ferpa");
+                  setIsLegalOpen(true);
+                }}
+              >
+                FERPA
+              </button>
+              <span>, &amp; </span>
+              <button
+                type="button"
+                className="home-legal-link"
+                onClick={() => {
+                  setLegalDoc("coppa");
+                  setIsLegalOpen(true);
+                }}
+              >
+                COPPA
               </button>
               <span>.</span>
             </div>

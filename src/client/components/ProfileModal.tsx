@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
-import { User as UserIcon, Check, X, Palette } from "lucide-react";
+import { User as UserIcon, Check, X, Palette, Dices, ShieldCheck } from "lucide-react";
 import type { User } from "../../server/types";
-import { USER_COLORS } from "../hooks/useUser";
+import { USER_COLORS, isCoppaChildMode, generateChildSafeName } from "../hooks/useUser";
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -19,6 +19,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState(currentUser.name);
   const [color, setColor] = useState(currentUser.color || USER_COLORS[0]);
+  const isChildMode = isCoppaChildMode();
 
   useEffect(() => {
     if (isOpen) {
@@ -33,6 +34,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       }
     }
   }, [isOpen, currentUser]);
+
+  const handleRandomizeChildName = () => {
+    setName(generateChildSafeName().slice(0, 16));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +66,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <div className="profile-preview-dot" style={{ backgroundColor: color }} />
             <div>
               <h2 id="profile-dialog-title" className="modal-title">Edit Identity</h2>
-              <p className="modal-subtitle">Your display name and name color in this room</p>
+              <p className="modal-subtitle">
+                {isChildMode ? "COPPA Child Safe Account" : "Your display name and name color in this room"}
+              </p>
             </div>
           </div>
           <button
@@ -74,22 +81,48 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </button>
         </div>
 
+        {isChildMode && (
+          <div className="coppa-safety-pill" style={{ margin: "0 1.25rem 1rem" }}>
+            <ShieldCheck size={14} className="text-accent" />
+            <span>
+              <strong>COPPA Protection Active:</strong> Custom names are restricted to pre-screened safe aliases.
+            </span>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="profile-form">
           <div className="form-group">
-            <label htmlFor="user-display-name" className="form-label">
-              Display Name
-            </label>
+            <div className="form-label-row">
+              <label htmlFor="user-display-name" className="form-label">
+                Display Name {isChildMode && "(Safe Alias)"}
+              </label>
+              {isChildMode && (
+                <button
+                  type="button"
+                  className="btn-text-link"
+                  onClick={handleRandomizeChildName}
+                  title="Generate another alias"
+                >
+                  <Dices size={14} /> Re-roll alias
+                </button>
+              )}
+            </div>
             <div className="input-with-icon">
               <UserIcon size={16} className="input-icon" />
               <input
                 id="user-display-name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value.slice(0, 16))}
+                onChange={(e) => {
+                  if (!isChildMode) {
+                    setName(e.target.value.slice(0, 16));
+                  }
+                }}
                 maxLength={16}
+                readOnly={isChildMode}
                 placeholder="Enter your name (max 16)..."
                 className="text-input"
-                autoFocus
+                autoFocus={!isChildMode}
                 required
               />
             </div>

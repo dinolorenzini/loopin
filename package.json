@@ -9,10 +9,12 @@
     "build:client": "vite build",
     "dev": "wrangler dev",
     "build": "vite build",
+    "predeploy": "npm run build",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "test": "node --use-system-ca test/gif-and-qr-test.mjs",
-    "test:all": "node --use-system-ca test/gif-and-qr-test.mjs && node test/new-features-and-conflicts-test.mjs && node test/batch-features-test.mjs && node test/security-test.mjs && node test/ws-test.mjs"
+    "test": "node test/compliance-test.mjs && node --use-system-ca test/gif-and-qr-test.mjs",
+    "test:compliance": "node test/compliance-test.mjs",
+    "test:all": "node test/compliance-test.mjs && node --use-system-ca test/gif-and-qr-test.mjs && node test/new-features-and-conflicts-test.mjs && node test/batch-features-test.mjs && node test/security-test.mjs && node test/ws-test.mjs"
   },
   "engines": {
     "node": ">=22.0.0"

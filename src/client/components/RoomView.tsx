@@ -16,6 +16,9 @@ import { SettingsModal } from "./SettingsModal";
 import { ShareModal } from "./ShareModal";
 import { ImageLightbox } from "./ImageLightbox";
 import { NameConflictModal } from "./NameConflictModal";
+import { ReportModal } from "./ReportModal";
+import { KnockRequestsModal } from "./KnockRequestsModal";
+import { WaitingRoomModal } from "./WaitingRoomModal";
 import { ChatBackground } from "./ChatBackground";
 import { processImageToBase64 } from "../utils/image";
 import type { User, Message } from "../../server/types";
@@ -45,6 +48,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [reportingMessage, setReportingMessage] = useState<Message | null>(null);
+  const [hiddenMessageIds, setHiddenMessageIds] = useState<Set<string>>(new Set());
+  const [isKnockModalOpen, setIsKnockModalOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -74,6 +80,17 @@ export const RoomView: React.FC<RoomViewProps> = ({
     markAsRead,
     sendTyping,
     updateProfile,
+    isOwner,
+    ownerId,
+    isRoomLocked,
+    isWaitingApproval,
+    joinDeniedReason,
+    pendingJoinRequests,
+    kickedReason,
+    setRoomLock,
+    approveJoinRequest,
+    denyJoinRequest,
+    kickUser,
   } = useChatRoom({
     roomId,
     currentUser,
@@ -261,6 +278,11 @@ export const RoomView: React.FC<RoomViewProps> = ({
         onToggleSound={toggleSound}
         notificationPermission={permission}
         onRequestNotifications={requestPermission}
+        isOwner={isOwner}
+        isRoomLocked={isRoomLocked}
+        onToggleRoomLock={() => setRoomLock(!isRoomLocked)}
+        pendingRequestsCount={pendingJoinRequests.length}
+        onOpenKnockRequests={() => setIsKnockModalOpen(true)}
       />
 
       <div className="room-body-container">
@@ -308,8 +330,10 @@ export const RoomView: React.FC<RoomViewProps> = ({
                   let latestSeenMyMsgId: string | null = null;
                   let latestDeliveredOnlyMyMsgId: string | null = null;
 
-                  for (let i = messages.length - 1; i >= 0; i--) {
-                    const m = messages[i];
+                  const visibleMessages = messages.filter((m) => !hiddenMessageIds.has(m.id));
+
+                  for (let i = visibleMessages.length - 1; i >= 0; i--) {
+                    const m = visibleMessages[i];
                     if (m.userId === currentUser.id && !m.isSystem) {
                       const hasOtherReaders = (m.readBy || []).some(
                         (readerId) =>
@@ -326,9 +350,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
                     }
                   }
 
-                  return messages.map((msg, index) => {
-                    const prev = messages[index - 1];
-                    const next = messages[index + 1];
+                  return visibleMessages.map((msg, index) => {
+                    const prev = visibleMessages[index - 1];
+                    const next = visibleMessages[index + 1];
                     const isMe = msg.userId === currentUser.id;
 
                     // Sequential clustering: 5 min window
@@ -371,6 +395,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
                           setEditingMessage(null);
                           setReplyingTo(targetMsg);
                         }}
+                        onReport={(targetMsg) => {
+                          setReportingMessage(targetMsg);
+                        }}
                         onScrollToMessage={scrollToMessage}
                         isTargetAvailable={isTargetAvailable}
                       />
@@ -408,6 +435,9 @@ export const RoomView: React.FC<RoomViewProps> = ({
           typingUsers={typingUsers}
           isPinned={isSidebarPinned}
           onTogglePin={handleTogglePin}
+          ownerId={ownerId}
+          isOwner={isOwner}
+          onKickUser={kickUser}
         />
       </div>
 
@@ -443,6 +473,15 @@ export const RoomView: React.FC<RoomViewProps> = ({
         onClose={() => setLightboxImage(null)}
       />
 
+      <ReportModal
+        isOpen={Boolean(reportingMessage)}
+        message={reportingMessage}
+        onClose={() => setReportingMessage(null)}
+        onReportSubmitted={(msgId) => {
+          setHiddenMessageIds((prev) => new Set(prev).add(msgId));
+        }}
+      />
+
       <NameConflictModal
         isOpen={Boolean(nameConflict)}
         conflict={nameConflict}
@@ -452,6 +491,29 @@ export const RoomView: React.FC<RoomViewProps> = ({
           onUpdateUser({ name: newName, ...(newColor ? { color: newColor } : {}) });
           resolveNameConflict(newName);
         }}
+        onLeave={onLeaveRoom}
+      />
+
+      {/* Host Knock Requests Dialog */}
+      <KnockRequestsModal
+        isOpen={isKnockModalOpen}
+        onClose={() => setIsKnockModalOpen(false)}
+        requests={pendingJoinRequests}
+        onApprove={approveJoinRequest}
+        onDeny={denyJoinRequest}
+        onApproveAll={() => {
+          pendingJoinRequests.forEach((req) => approveJoinRequest(req.id));
+        }}
+      />
+
+      {/* Student / Participant Waiting Room & Knock Status */}
+      <WaitingRoomModal
+        isOpen={isWaitingApproval || Boolean(joinDeniedReason) || Boolean(kickedReason)}
+        roomId={roomId}
+        isDenied={Boolean(joinDeniedReason)}
+        deniedReason={joinDeniedReason}
+        isKicked={Boolean(kickedReason)}
+        kickedReason={kickedReason}
         onLeave={onLeaveRoom}
       />
     </div>

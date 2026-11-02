@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { ClientMessage, Message, ServerMessage, User, ReplyReference } from "../../server/types";
+import type { ClientMessage, Message, ServerMessage, User, ReplyReference, PendingJoinRequest } from "../../server/types";
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected";
 
@@ -21,6 +21,13 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [typingUsers, setTypingUsers] = useState<{ id: string; name: string }[]>([]);
   const [nameConflict, setNameConflict] = useState<NameConflictInfo | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [isRoomLocked, setIsRoomLocked] = useState(false);
+  const [isWaitingApproval, setIsWaitingApproval] = useState(false);
+  const [joinDeniedReason, setJoinDeniedReason] = useState<string | null>(null);
+  const [pendingJoinRequests, setPendingJoinRequests] = useState<PendingJoinRequest[]>([]);
+  const [kickedReason, setKickedReason] = useState<string | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
@@ -144,6 +151,12 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
           case "init": {
             setNameConflict(null);
+            setIsWaitingApproval(false);
+            setJoinDeniedReason(null);
+            setIsOwner(Boolean(data.isOwner));
+            setOwnerId(data.ownerId || null);
+            setIsRoomLocked(Boolean(data.isLocked));
+            setPendingJoinRequests(data.pendingRequests || []);
             const initialMsgs = (data.messages || []).filter(
               (m: Message) => !(m.isSystem && m.text === `${currentUser.name} joined the room`)
             );
@@ -153,6 +166,50 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
               if (u && u.id) userMap.set(u.id, u);
             }
             setUsers(Array.from(userMap.values()));
+            break;
+          }
+
+          case "join_requested": {
+            setIsWaitingApproval(true);
+            setJoinDeniedReason(null);
+            break;
+          }
+
+          case "join_denied": {
+            setIsWaitingApproval(false);
+            setJoinDeniedReason(data.message || "Host declined your request to join.");
+            setStatus("disconnected");
+            break;
+          }
+
+          case "room_lock_changed": {
+            setIsRoomLocked(data.locked);
+            setOwnerId(data.ownerId || null);
+            break;
+          }
+
+          case "owner_changed": {
+            setOwnerId(data.ownerId || null);
+            setIsOwner(data.ownerId === currentUser.id);
+            break;
+          }
+
+          case "knock_request": {
+            setPendingJoinRequests((prev) => [
+              ...prev.filter((r) => r.id !== data.request.id),
+              data.request,
+            ]);
+            break;
+          }
+
+          case "knock_resolved": {
+            setPendingJoinRequests((prev) => prev.filter((r) => r.id !== data.userId));
+            break;
+          }
+
+          case "kicked": {
+            setKickedReason(data.message || "You were removed from the room by the host.");
+            setStatus("disconnected");
             break;
           }
 
@@ -530,6 +587,46 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
     [sendPacket]
   );
 
+  const setRoomLock = useCallback(
+    (locked: boolean) => {
+      sendPacket({
+        type: "set_room_lock",
+        locked,
+      });
+    },
+    [sendPacket]
+  );
+
+  const approveJoinRequest = useCallback(
+    (userId: string) => {
+      sendPacket({
+        type: "approve_join",
+        userId,
+      });
+    },
+    [sendPacket]
+  );
+
+  const denyJoinRequest = useCallback(
+    (userId: string) => {
+      sendPacket({
+        type: "deny_join",
+        userId,
+      });
+    },
+    [sendPacket]
+  );
+
+  const kickUser = useCallback(
+    (userId: string) => {
+      sendPacket({
+        type: "kick_user",
+        userId,
+      });
+    },
+    [sendPacket]
+  );
+
   return {
     messages,
     users,
@@ -537,6 +634,17 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
     typingUsers,
     nameConflict,
     resolveNameConflict,
+    isOwner,
+    ownerId,
+    isRoomLocked,
+    isWaitingApproval,
+    joinDeniedReason,
+    pendingJoinRequests,
+    kickedReason,
+    setRoomLock,
+    approveJoinRequest,
+    denyJoinRequest,
+    kickUser,
     sendMessage,
     editMessage,
     deleteMessage,

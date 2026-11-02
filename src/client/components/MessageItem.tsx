@@ -8,6 +8,7 @@ import {
   X,
   Clock,
   Reply,
+  Flag,
 } from "lucide-react";
 import type { Message, User } from "../../server/types";
 import { MarkdownRenderer } from "../utils/markdown";
@@ -28,6 +29,7 @@ interface MessageItemProps {
   onReact: (id: string, emoji: string) => void;
   onExpandImage: (url: string) => void;
   onReply: (message: Message) => void;
+  onReport?: (message: Message) => void;
   onScrollToMessage: (targetId: string) => void;
   isTargetAvailable?: (targetId: string) => boolean;
 }
@@ -69,6 +71,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onReact,
   onExpandImage,
   onReply,
+  onReport,
   onScrollToMessage,
   isTargetAvailable,
 }) => {
@@ -332,6 +335,18 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                   <Trash2 size={13} />
                 </button>
               </>
+            )}
+
+            {!isMe && onReport && (
+              <button
+                type="button"
+                className="hover-action-btn report-btn"
+                onClick={() => onReport(message)}
+                title="Report message (EU DSA Art. 16)"
+                aria-label="Report message"
+              >
+                <Flag size={13} />
+              </button>
             )}
           </div>
         </div>

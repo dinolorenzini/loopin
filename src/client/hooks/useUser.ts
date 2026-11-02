@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import type { User } from "../../server/types";
+import type { AgeBracket } from "../types/compliance";
 
 export const USER_COLORS = [
   "#facc15", // Loopin Gold
@@ -23,6 +24,40 @@ export function generateRandomName(): string {
   const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
   const animal = animals[Math.floor(Math.random() * animals.length)];
   return `${adj}${animal}-${num}`;
+}
+
+export function generateChildSafeName(): string {
+  const safeAdjectives = ["Sunny", "Cosmic", "Happy", "Star", "Brave", "Swift", "Magic", "Bright", "Joy", "Super"];
+  const safeAnimals = ["Panda", "Otter", "Dolphin", "Penguin", "Koala", "Fox", "Bunny", "Owl", "Gecko", "Puppy"];
+  const num = Math.floor(10 + Math.random() * 90);
+  const adj = safeAdjectives[Math.floor(Math.random() * safeAdjectives.length)];
+  const animal = safeAnimals[Math.floor(Math.random() * safeAnimals.length)];
+  return `${adj}${animal}-${num}`.slice(0, 16);
+}
+
+export function getUserAgeBracket(): AgeBracket | null {
+  if (typeof window === "undefined") return null;
+  const bracket = localStorage.getItem("loopin_age_bracket");
+  if (bracket === "under13" || bracket === "13-15" || bracket === "16+") {
+    return bracket as AgeBracket;
+  }
+  return null;
+}
+
+export function setUserAgeBracket(bracket: AgeBracket): void {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("loopin_age_bracket", bracket);
+    if (bracket === "under13") {
+      localStorage.setItem("loopin_coppa_mode", "true");
+    } else {
+      localStorage.removeItem("loopin_coppa_mode");
+    }
+  }
+}
+
+export function isCoppaChildMode(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("loopin_coppa_mode") === "true";
 }
 
 export function isUserOnboarded(): boolean {
@@ -55,9 +90,11 @@ export function useUser() {
       sessionStorage.setItem("loopin_tab_user_id", id);
     }
 
+    const coppaActive = isCoppaChildMode();
+
     let name = sessionStorage.getItem("loopin_user_name") || localStorage.getItem("loopin_user_name");
     if (!name) {
-      name = generateRandomName().slice(0, 16);
+      name = coppaActive ? generateChildSafeName().slice(0, 16) : generateRandomName().slice(0, 16);
       localStorage.setItem("loopin_user_name", name);
       sessionStorage.setItem("loopin_user_name", name);
     } else {
@@ -86,10 +123,11 @@ export function useUser() {
       color,
       joinedAt: Date.now(),
       isFocused: true,
+      complianceRole: coppaActive ? "child" : "standard",
     };
   });
 
-  const updateUser = useCallback((updates: Partial<Pick<User, "name" | "color">>) => {
+  const updateUser = useCallback((updates: Partial<Pick<User, "name" | "color" | "complianceRole">>) => {
     setUser((prev) => {
       const sanitizedName = updates.name !== undefined ? updates.name.trim().slice(0, 16) : prev.name;
       const next = { ...prev, ...updates, name: sanitizedName };
@@ -102,6 +140,13 @@ export function useUser() {
           localStorage.setItem("loopin_user_color", next.color);
           localStorage.setItem("loopin_user_color_customized", "true");
           sessionStorage.setItem("loopin_user_color", next.color);
+        }
+        if (updates.complianceRole !== undefined) {
+          if (updates.complianceRole === "child") {
+            localStorage.setItem("loopin_coppa_mode", "true");
+          } else {
+            localStorage.removeItem("loopin_coppa_mode");
+          }
         }
       }
       return next;

@@ -14,10 +14,17 @@ import {
   Settings,
   Maximize2,
   Minimize2,
+  ShieldCheck,
+  GraduationCap,
+  Lock,
+  Unlock,
+  UserCheck,
+  Crown,
 } from "lucide-react";
 import type { User } from "../../server/types";
 import { useSettings } from "../hooks/useSettings";
 import { LoopinLogo } from "./LoopinLogo";
+import { isCoppaChildMode } from "../hooks/useUser";
 
 interface RoomHeaderProps {
   roomId: string;
@@ -33,6 +40,11 @@ interface RoomHeaderProps {
   onToggleSound: () => void;
   notificationPermission: NotificationPermission;
   onRequestNotifications: () => void;
+  isOwner?: boolean;
+  isRoomLocked?: boolean;
+  onToggleRoomLock?: () => void;
+  pendingRequestsCount?: number;
+  onOpenKnockRequests?: () => void;
 }
 
 export const RoomHeader: React.FC<RoomHeaderProps> = ({
@@ -49,6 +61,11 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   onToggleSound,
   notificationPermission,
   onRequestNotifications,
+  isOwner = false,
+  isRoomLocked = false,
+  onToggleRoomLock,
+  pendingRequestsCount = 0,
+  onOpenKnockRequests,
 }) => {
   const { settings, updateSetting } = useSettings();
   const [copied, setCopied] = useState(false);
@@ -118,6 +135,58 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
                 aria-label="Show QR code and share options"
               >
                 <Share2 size={13} />
+              </button>
+            )}
+
+            {isCoppaChildMode() && (
+              <span className="compliance-header-tag tag-coppa" title="Under-13 Child-Safe Mode Active (COPPA Compliant)">
+                <ShieldCheck size={12} />
+                <span>Child Safe</span>
+              </span>
+            )}
+            {settings.ferpaMode && (
+              <span className="compliance-header-tag tag-ferpa" title="Classroom Privacy Mode (FERPA 34 CFR § 99.31)">
+                <GraduationCap size={12} />
+                <span>FERPA Edu</span>
+              </span>
+            )}
+
+            {isOwner && (
+              <span className="compliance-header-tag tag-owner" title="You are the host/moderator of this room">
+                <Crown size={12} />
+                <span>Host</span>
+              </span>
+            )}
+
+            {isOwner && onToggleRoomLock && (
+              <button
+                type="button"
+                className={`header-lock-toggle-btn ${isRoomLocked ? "is-locked" : ""}`}
+                onClick={onToggleRoomLock}
+                title={isRoomLocked ? "Room is locked. Click to allow direct joins." : "Room is open. Click to require permission to join."}
+                aria-label={isRoomLocked ? "Unlock room" : "Lock room"}
+              >
+                {isRoomLocked ? <Lock size={13} /> : <Unlock size={13} />}
+                <span>{isRoomLocked ? "Locked" : "Open"}</span>
+              </button>
+            )}
+
+            {!isOwner && isRoomLocked && (
+              <span className="compliance-header-tag tag-locked" title="Room is locked by host">
+                <Lock size={12} />
+                <span>Locked</span>
+              </span>
+            )}
+
+            {isOwner && pendingRequestsCount > 0 && onOpenKnockRequests && (
+              <button
+                type="button"
+                className="header-knock-alert-btn"
+                onClick={onOpenKnockRequests}
+                title={`${pendingRequestsCount} participant(s) waiting to enter`}
+              >
+                <UserCheck size={13} />
+                <span>{pendingRequestsCount} Waiting</span>
               </button>
             )}
           </div>
