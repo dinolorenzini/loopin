@@ -67,6 +67,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
   pendingRequestsCount = 0,
   onOpenKnockRequests,
 }) => {
+  const isGlobal = (roomId || "").toLowerCase() === "global";
   const { settings, updateSetting } = useSettings();
   const [copied, setCopied] = useState(false);
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
@@ -153,14 +154,14 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
               </span>
             )}
 
-            {isOwner && (
+            {!isGlobal && isOwner && (
               <span className="compliance-header-tag tag-owner" title="You are the host/moderator of this room">
                 <Crown size={12} />
                 <span>Host</span>
               </span>
             )}
 
-            {isOwner && onToggleRoomLock && (
+            {!isGlobal && isOwner && onToggleRoomLock && (
               <button
                 type="button"
                 className={`header-lock-toggle-btn ${isRoomLocked ? "is-locked" : ""}`}
@@ -173,14 +174,14 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
               </button>
             )}
 
-            {!isOwner && isRoomLocked && (
+            {!isGlobal && !isOwner && isRoomLocked && (
               <span className="compliance-header-tag tag-locked" title="Room is locked by host">
                 <Lock size={12} />
                 <span>Locked</span>
               </span>
             )}
 
-            {isOwner && pendingRequestsCount > 0 && onOpenKnockRequests && (
+            {!isGlobal && isOwner && pendingRequestsCount > 0 && onOpenKnockRequests && (
               <button
                 type="button"
                 className="header-knock-alert-btn"

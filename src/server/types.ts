@@ -100,5 +100,6 @@ export type ServerMessage =
   | { type: "knock_request"; request: PendingJoinRequest }
   | { type: "knock_resolved"; userId: string; approved: boolean }
   | { type: "kicked"; message: string }
+  | { type: "rate_limited"; retryAfter?: number; message?: string }
   | { type: "pong" }
   | { type: "error"; message: string };

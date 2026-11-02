@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Users, X, Pin, PinOff, ShieldCheck, UserX } from "lucide-react";
+import { Users, X, Pin, PinOff, ShieldCheck, UserX, Crown } from "lucide-react";
 import type { User } from "../../server/types";
 
 interface UsersSidebarProps {
@@ -13,6 +13,7 @@ interface UsersSidebarProps {
   ownerId?: string | null;
   isOwner?: boolean;
   onKickUser?: (userId: string) => void;
+  roomId?: string;
 }
 
 function formatRelativeActivity(timestamp?: number): string {
@@ -38,7 +39,10 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
   ownerId,
   isOwner,
   onKickUser,
+  roomId,
 }) => {
+  const isGlobal = (roomId || "").toLowerCase() === "global";
+
   // Relative time ticker
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -134,7 +138,7 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
             <div className="members-stack">
               {onlineMembers.map((u) => {
                 const isMe = u.id === currentUserId;
-                const isHost = u.id === ownerId || Boolean(u.isOwner);
+                const isHost = !isGlobal && (u.id === ownerId || Boolean(u.isOwner));
                 const isTyping = typingUsers.some((t) => t.id === u.id);
                 const isFocused = u.isFocused !== false;
 
@@ -155,7 +159,8 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
                         </span>
                         {isHost && (
                           <span className="member-host-badge" title="Room Host / Creator">
-                            👑 Host
+                            <Crown size={11} />
+                            <span>Host</span>
                           </span>
                         )}
                         {isMe && <span className="member-you-marker">(you)</span>}
@@ -172,7 +177,7 @@ export const UsersSidebar: React.FC<UsersSidebarProps> = ({
                       </span>
                     </div>
 
-                    {isOwner && !isMe && onKickUser && (
+                    {!isGlobal && isOwner && !isMe && onKickUser && (
                       <button
                         type="button"
                         className="member-kick-btn"

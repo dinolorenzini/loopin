@@ -9,6 +9,9 @@ import {
   Clock,
   Reply,
   Flag,
+  Crown,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import type { Message, User } from "../../server/types";
 import { MarkdownRenderer } from "../utils/markdown";
@@ -112,9 +115,26 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   // System Announcement Row
   if (message.isSystem) {
+    let text = message.text || "";
+    let IconComponent = null;
+
+    if (text.includes("👑") || text.toLowerCase().includes("host")) {
+      IconComponent = Crown;
+      text = text.replace(/👑\s*/g, "");
+    } else if (text.includes("🔒") || text.toLowerCase().includes("locked")) {
+      IconComponent = Lock;
+      text = text.replace(/🔒\s*/g, "");
+    } else if (text.includes("🔓") || text.toLowerCase().includes("unlocked")) {
+      IconComponent = Unlock;
+      text = text.replace(/🔓\s*/g, "");
+    }
+
     return (
       <div id={`msg-${message.id}`} className="system-announcement-row">
-        <span className="system-pill">{message.text}</span>
+        <span className="system-pill">
+          {IconComponent && <IconComponent size={12} className="system-pill-icon" />}
+          <span>{text}</span>
+        </span>
         <span className="system-time">{timeFormatted}</span>
       </div>
     );

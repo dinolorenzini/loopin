@@ -91,11 +91,14 @@ export const RoomView: React.FC<RoomViewProps> = ({
     approveJoinRequest,
     denyJoinRequest,
     kickUser,
+    rateLimitSecondsRemaining,
   } = useChatRoom({
     roomId,
     currentUser,
     onNewMessage,
   });
+
+  const isGlobal = (roomId || "").toLowerCase() === "global";
 
 
   const scrollToMessage = useCallback(
@@ -423,6 +426,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
               editMessage(id, newText);
               setEditingMessage(null);
             }}
+            rateLimitSecondsRemaining={rateLimitSecondsRemaining}
           />
         </div>
 
@@ -438,6 +442,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
           ownerId={ownerId}
           isOwner={isOwner}
           onKickUser={kickUser}
+          roomId={roomId}
         />
       </div>
 
@@ -495,27 +500,31 @@ export const RoomView: React.FC<RoomViewProps> = ({
       />
 
       {/* Host Knock Requests Dialog */}
-      <KnockRequestsModal
-        isOpen={isKnockModalOpen}
-        onClose={() => setIsKnockModalOpen(false)}
-        requests={pendingJoinRequests}
-        onApprove={approveJoinRequest}
-        onDeny={denyJoinRequest}
-        onApproveAll={() => {
-          pendingJoinRequests.forEach((req) => approveJoinRequest(req.id));
-        }}
-      />
+      {!isGlobal && (
+        <KnockRequestsModal
+          isOpen={isKnockModalOpen}
+          onClose={() => setIsKnockModalOpen(false)}
+          requests={pendingJoinRequests}
+          onApprove={approveJoinRequest}
+          onDeny={denyJoinRequest}
+          onApproveAll={() => {
+            pendingJoinRequests.forEach((req) => approveJoinRequest(req.id));
+          }}
+        />
+      )}
 
       {/* Student / Participant Waiting Room & Knock Status */}
-      <WaitingRoomModal
-        isOpen={isWaitingApproval || Boolean(joinDeniedReason) || Boolean(kickedReason)}
-        roomId={roomId}
-        isDenied={Boolean(joinDeniedReason)}
-        deniedReason={joinDeniedReason}
-        isKicked={Boolean(kickedReason)}
-        kickedReason={kickedReason}
-        onLeave={onLeaveRoom}
-      />
+      {!isGlobal && (
+        <WaitingRoomModal
+          isOpen={isWaitingApproval || Boolean(joinDeniedReason) || Boolean(kickedReason)}
+          roomId={roomId}
+          isDenied={Boolean(joinDeniedReason)}
+          deniedReason={joinDeniedReason}
+          isKicked={Boolean(kickedReason)}
+          kickedReason={kickedReason}
+          onLeave={onLeaveRoom}
+        />
+      )}
     </div>
   );
 };

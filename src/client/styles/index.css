@@ -2945,8 +2945,15 @@ button:disabled {
   color: var(--text-muted);
 }
 .system-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--text-secondary);
   font-weight: 500;
+}
+.system-pill-icon {
+  flex-shrink: 0;
+  color: var(--primary-accent);
 }
 .system-time {
   font-size: 11px;
@@ -5147,6 +5154,38 @@ button:disabled {
 
 .compliance-alert-dismiss:hover {
   color: var(--text-primary);
+}
+
+/* 2b. Message Rate Limit Warning Bar */
+.rate-limit-warning-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.95rem;
+  margin-bottom: 0.5rem;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  border-radius: var(--radius-sm);
+  color: #fca5a5;
+  font-size: 13px;
+  font-weight: 500;
+  animation: slideDownFade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
+}
+
+.rate-limit-warning-bar .rate-limit-icon {
+  color: #ef4444;
+  flex-shrink: 0;
+}
+
+.rate-limit-warning-bar .rate-limit-text {
+  flex: 1;
+  line-height: 1.35;
+  color: #fee2e2;
+}
+
+.rate-limit-warning-bar strong {
+  color: #ffffff;
 }
 
 /* 3. Compliance Header Badges */

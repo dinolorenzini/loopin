@@ -5,6 +5,7 @@ import { TokenBucketRateLimiter } from "./rateLimiter";
 interface SocketAttachment {
   userId: string;
   roomId: string;
+  lastTypingTime?: number;
 }
 
 export class RoomDurableObject extends DurableObject {
@@ -18,10 +19,33 @@ export class RoomDurableObject extends DurableObject {
   private ownerId: string | null = null;
   private isLocked: boolean = false;
   private pendingRequests: Map<string, { user: User; ws: WebSocket; requestedAt: number }> = new Map();
+  private ownerTransferTimeout: any = null;
+
+  public isGlobalRoom(): boolean {
+    return (this.roomId || "").toLowerCase() === "global";
+  }
 
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
     this.initDb();
+  }
+
+  private saveRoomMeta(): void {
+    if (this.isGlobalRoom()) {
+      this.ownerId = null;
+      this.isLocked = false;
+      try {
+        this.ctx.storage.sql.exec("DELETE FROM room_meta;");
+      } catch {}
+      return;
+    }
+    try {
+      this.ctx.storage.sql.exec(
+        "INSERT OR REPLACE INTO room_meta (key, value) VALUES ('ownerId', ?), ('isLocked', ?);",
+        this.ownerId || "",
+        this.isLocked ? "true" : "false"
+      );
+    } catch {}
   }
 
   private initDb(): void {
@@ -61,6 +85,13 @@ export class RoomDurableObject extends DurableObject {
         );
       `);
 
+      this.ctx.storage.sql.exec(`
+        CREATE TABLE IF NOT EXISTS room_meta (
+          key TEXT PRIMARY KEY,
+          value TEXT
+        );
+      `);
+
       // Restore messages from SQLite if available
       const msgRows = this.ctx.storage.sql.exec<any>("SELECT * FROM messages ORDER BY timestamp ASC").toArray();
       this.messages = msgRows.map((r) => this.rowToMessage(r));
@@ -77,6 +108,23 @@ export class RoomDurableObject extends DurableObject {
           lastActiveAt: Number(u.lastActiveAt) || Date.now(),
           isOnline: false,
         });
+      }
+
+      // Restore room metadata (owner & lock) if not global
+      if (!this.isGlobalRoom()) {
+        try {
+          const ownerRow = this.ctx.storage.sql.exec<any>("SELECT value FROM room_meta WHERE key = 'ownerId'").toArray()[0];
+          if (ownerRow?.value) {
+            this.ownerId = String(ownerRow.value);
+          }
+          const lockRow = this.ctx.storage.sql.exec<any>("SELECT value FROM room_meta WHERE key = 'isLocked'").toArray()[0];
+          if (lockRow?.value) {
+            this.isLocked = lockRow.value === "true";
+          }
+        } catch {}
+      } else {
+        this.ownerId = null;
+        this.isLocked = false;
       }
 
       this.dbInitialized = true;
@@ -141,7 +189,7 @@ export class RoomDurableObject extends DurableObject {
   private completeUserJoin(ws: WebSocket, user: User): void {
     user.isOnline = true;
     user.lastActiveAt = Date.now();
-    user.isOwner = (user.id === this.ownerId);
+    user.isOwner = !this.isGlobalRoom() && (user.id === this.ownerId);
 
     const attachment: SocketAttachment = {
       userId: user.id,
@@ -185,7 +233,7 @@ export class RoomDurableObject extends DurableObject {
         userId: "system",
         userName: "System",
         userColor: "#facc15",
-        text: user.isOwner ? `👑 ${user.name} joined as host` : `${user.name} joined the room`,
+        text: (!this.isGlobalRoom() && user.isOwner) ? `${user.name} joined as host` : `${user.name} joined the room`,
         timestamp: Date.now(),
         isSystem: true,
         status: "delivered",
@@ -215,10 +263,10 @@ export class RoomDurableObject extends DurableObject {
       messages: joinMsg ? this.messages.filter((m) => m.id !== joinMsg.id) : this.messages,
       users: activeUsers,
       selfId: user.id,
-      isOwner: user.id === this.ownerId,
-      ownerId: this.ownerId,
-      isLocked: this.isLocked,
-      pendingRequests: user.id === this.ownerId ? this.getPendingRequestsList() : undefined,
+      isOwner: !this.isGlobalRoom() && (user.id === this.ownerId),
+      ownerId: this.isGlobalRoom() ? null : this.ownerId,
+      isLocked: this.isGlobalRoom() ? false : this.isLocked,
+      pendingRequests: (!this.isGlobalRoom() && user.id === this.ownerId) ? this.getPendingRequestsList() : undefined,
     });
 
     if (!wasAlreadyOnline) {
@@ -262,6 +310,11 @@ export class RoomDurableObject extends DurableObject {
       this.roomId = roomParam;
     } else if (!this.roomId) {
       this.roomId = "general";
+    }
+
+    if (this.isGlobalRoom()) {
+      this.ownerId = null;
+      this.isLocked = false;
     }
 
     if (url.pathname.endsWith("/ws")) {
@@ -353,14 +406,29 @@ export class RoomDurableObject extends DurableObject {
           user.isFocused = Boolean(data.user.isFocused);
 
           // Establish or confirm Room Ownership
-          if (!this.ownerId || !this.users.has(this.ownerId) || !this.isUserOnline(this.ownerId)) {
-            this.ownerId = user.id;
+          if (this.isGlobalRoom()) {
+            this.ownerId = null;
+            this.isLocked = false;
+            user.isOwner = false;
+          } else {
+            // First user to join non-global room becomes host
+            if (!this.ownerId) {
+              this.ownerId = user.id;
+              this.saveRoomMeta();
+            }
+            // If the host is reconnecting, cancel any pending handover timer
+            if (user.id === this.ownerId) {
+              if (this.ownerTransferTimeout) {
+                clearTimeout(this.ownerTransferTimeout);
+                this.ownerTransferTimeout = null;
+              }
+            }
+            user.isOwner = (user.id === this.ownerId);
           }
-          user.isOwner = (user.id === this.ownerId);
 
           // If Room is Locked and user is NOT the owner and not already admitted/online
           const isAlreadyOnline = Boolean(this.users.has(user.id) && this.users.get(user.id)?.isOnline);
-          if (this.isLocked && user.id !== this.ownerId && !isAlreadyOnline) {
+          if (!this.isGlobalRoom() && this.isLocked && user.id !== this.ownerId && !isAlreadyOnline) {
             this.pendingRequests.set(user.id, { user, ws, requestedAt: Date.now() });
             const attachment: SocketAttachment = {
               userId: user.id,
@@ -446,11 +514,11 @@ export class RoomDurableObject extends DurableObject {
             }
           }
 
-          // Token Bucket Rate Limiting (max 8 burst, 2 msgs/sec steady state)
+          // Token Bucket Rate Limiting (max 6 burst, 2 msgs/sec steady state)
           if (!this.checkRateLimit(attachment.userId, 1)) {
             this.sendTo(ws, {
-              type: "error",
-              message: "You are sending messages too quickly. Please wait a moment.",
+              type: "rate_limited",
+              retryAfter: 3,
             });
             return;
           }
@@ -743,8 +811,14 @@ export class RoomDurableObject extends DurableObject {
           const attachment = ws.deserializeAttachment() as SocketAttachment | null;
           if (!attachment?.userId) return;
 
+          const now = Date.now();
           if (data.isTyping) {
-            this.typingUsers.set(attachment.userId, Date.now() + 4000);
+            if (attachment.lastTypingTime && now - attachment.lastTypingTime < 500) {
+              return;
+            }
+            attachment.lastTypingTime = now;
+            ws.serializeAttachment(attachment);
+            this.typingUsers.set(attachment.userId, now + 4000);
           } else {
             this.typingUsers.delete(attachment.userId);
           }
@@ -830,10 +904,12 @@ export class RoomDurableObject extends DurableObject {
         }
 
         case "set_room_lock": {
+          if (this.isGlobalRoom()) return;
           const attachment = ws.deserializeAttachment() as SocketAttachment | null;
           if (!attachment?.userId || attachment.userId !== this.ownerId) return;
 
           this.isLocked = Boolean(data.locked);
+          this.saveRoomMeta();
           this.broadcast({
             type: "room_lock_changed",
             locked: this.isLocked,
@@ -862,6 +938,7 @@ export class RoomDurableObject extends DurableObject {
         }
 
         case "approve_join": {
+          if (this.isGlobalRoom()) return;
           const attachment = ws.deserializeAttachment() as SocketAttachment | null;
           if (!attachment?.userId || attachment.userId !== this.ownerId) return;
 
@@ -882,6 +959,7 @@ export class RoomDurableObject extends DurableObject {
         }
 
         case "deny_join": {
+          if (this.isGlobalRoom()) return;
           const attachment = ws.deserializeAttachment() as SocketAttachment | null;
           if (!attachment?.userId || attachment.userId !== this.ownerId) return;
 
@@ -903,6 +981,7 @@ export class RoomDurableObject extends DurableObject {
         }
 
         case "kick_user": {
+          if (this.isGlobalRoom()) return;
           const attachment = ws.deserializeAttachment() as SocketAttachment | null;
           if (!attachment?.userId || attachment.userId !== this.ownerId) return;
           if (data.userId === this.ownerId) return;
@@ -1009,37 +1088,45 @@ export class RoomDurableObject extends DurableObject {
               message: leaveMsg,
             });
 
-            // If the user who went offline was the owner, transfer ownership to the next active user
-            if (user.id === this.ownerId) {
-              const activeRemaining = this.getActiveUsersList().filter((u) => u.id !== user.id);
-              if (activeRemaining.length > 0) {
-                const nextOwner = activeRemaining[0];
-                this.ownerId = nextOwner.id;
-                nextOwner.isOwner = true;
-                this.users.set(nextOwner.id, nextOwner);
-                this.broadcast({
-                  type: "owner_changed",
-                  ownerId: this.ownerId,
-                });
-                const transferMsg: Message = {
-                  id: crypto.randomUUID(),
-                  roomId: this.roomId,
-                  userId: "system",
-                  userName: "System",
-                  userColor: "#facc15",
-                  text: `👑 ${nextOwner.name} is now the host of this room`,
-                  timestamp: Date.now(),
-                  isSystem: true,
-                  status: "delivered",
-                };
-                this.messages.push(transferMsg);
-                this.broadcast({
-                  type: "new_message",
-                  message: transferMsg,
-                });
-              } else {
-                this.ownerId = null;
-              }
+            // If the user who went offline was the owner, don't immediately strip host!
+            // Give a 60-second grace window for tab refresh or brief network reconnections.
+            if (!this.isGlobalRoom() && user.id === this.ownerId) {
+              if (this.ownerTransferTimeout) clearTimeout(this.ownerTransferTimeout);
+              this.ownerTransferTimeout = setTimeout(() => {
+                if (this.ownerId && !this.isUserOnline(this.ownerId)) {
+                  const activeRemaining = this.getActiveUsersList().filter((u) => u.id !== this.ownerId);
+                  if (activeRemaining.length > 0) {
+                    const nextOwner = activeRemaining[0];
+                    this.ownerId = nextOwner.id;
+                    nextOwner.isOwner = true;
+                    this.users.set(nextOwner.id, nextOwner);
+                    this.saveRoomMeta();
+                    this.broadcast({
+                      type: "owner_changed",
+                      ownerId: this.ownerId,
+                    });
+                    const transferMsg: Message = {
+                      id: crypto.randomUUID(),
+                      roomId: this.roomId,
+                      userId: "system",
+                      userName: "System",
+                      userColor: "#facc15",
+                      text: `${nextOwner.name} is now the host of this room`,
+                      timestamp: Date.now(),
+                      isSystem: true,
+                      status: "delivered",
+                    };
+                    this.messages.push(transferMsg);
+                    this.broadcast({
+                      type: "new_message",
+                      message: transferMsg,
+                    });
+                  } else {
+                    this.ownerId = null;
+                    this.saveRoomMeta();
+                  }
+                }
+              }, 60000);
             }
 
             this.broadcast({
@@ -1058,6 +1145,10 @@ export class RoomDurableObject extends DurableObject {
 
     // Ephemeral auto-wipe when all users disconnect from the room
     if (activeSockets.length === 0) {
+      if (this.ownerTransferTimeout) {
+        clearTimeout(this.ownerTransferTimeout);
+        this.ownerTransferTimeout = null;
+      }
       this.messages = [];
       this.users.clear();
       this.userSockets.clear();
@@ -1069,6 +1160,7 @@ export class RoomDurableObject extends DurableObject {
       try {
         this.ctx.storage.sql.exec("DELETE FROM messages;");
         this.ctx.storage.sql.exec("DELETE FROM users;");
+        this.ctx.storage.sql.exec("DELETE FROM room_meta;");
       } catch {}
       await this.ctx.storage.deleteAll();
     }

@@ -35,6 +35,7 @@ interface ChatInputProps {
   editingMessage?: Message | null;
   onCancelEdit?: () => void;
   onSaveEdit?: (id: string, text: string) => void;
+  rateLimitSecondsRemaining?: number;
 }
 
 /**
@@ -196,6 +197,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   editingMessage = null,
   onCancelEdit,
   onSaveEdit,
+  rateLimitSecondsRemaining = 0,
 }) => {
   const [text, setText] = useState("");
   const [pendingImage, setPendingImage] = useState<string | null>(null);
@@ -286,6 +288,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleSend = () => {
+    if (rateLimitSecondsRemaining > 0) return;
     const cleanText = text.trim();
     if (!cleanText && !pendingImage) return;
 
@@ -352,6 +355,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         return;
       }
       e.preventDefault();
+      if (rateLimitSecondsRemaining > 0) {
+        return;
+      }
       handleSend();
     } else if (e.key === "Escape") {
       if (showEmojiPicker) {
@@ -593,6 +599,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       )}
 
+      {/* Message Rate Limit Warning Banner */}
+      {rateLimitSecondsRemaining > 0 && (
+        <div className="rate-limit-warning-bar" role="alert">
+          <AlertTriangle size={15} className="rate-limit-icon" />
+          <span className="rate-limit-text">
+            You are going too fast! Wait {rateLimitSecondsRemaining}s to chat again.
+          </span>
+        </div>
+      )}
+
       {/* 5. Main Input Box with Direct In-Place Active Markdown Preview */}
       <div className="chat-input-box">
         <input
@@ -683,7 +699,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           type="button"
           className={`chat-send-accent-btn ${editingMessage ? "is-editing" : ""}`}
           onClick={handleSend}
-          disabled={disabled || (!text.trim() && !pendingImage)}
+          disabled={disabled || rateLimitSecondsRemaining > 0 || (!text.trim() && !pendingImage)}
           title={editingMessage ? "Save changes (Enter)" : "Send message (Enter)"}
           aria-label={editingMessage ? "Save changes" : "Send message"}
         >

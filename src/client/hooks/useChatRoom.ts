@@ -28,6 +28,9 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
   const [joinDeniedReason, setJoinDeniedReason] = useState<string | null>(null);
   const [pendingJoinRequests, setPendingJoinRequests] = useState<PendingJoinRequest[]>([]);
   const [kickedReason, setKickedReason] = useState<string | null>(null);
+  const [rateLimitSecondsRemaining, setRateLimitSecondsRemaining] = useState<number>(0);
+
+  const isGlobal = (roomId || "").toLowerCase() === "global";
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
@@ -43,6 +46,39 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
   // Offline outbox queue for messages sent while disconnected (Item 8)
   const pendingOutboxRef = useRef<ClientMessage[]>([]);
+
+  // Message rate limit tracking
+  const recentSendTimestampsRef = useRef<number[]>([]);
+  const cooldownIntervalRef = useRef<any>(null);
+  const lastTypingSentRef = useRef<number>(0);
+
+  const startRateLimitCooldown = useCallback((seconds: number) => {
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+    }
+    const safeSecs = Math.max(1, seconds);
+    const targetEnd = Date.now() + safeSecs * 1000;
+    setRateLimitSecondsRemaining(safeSecs);
+
+    cooldownIntervalRef.current = setInterval(() => {
+      const remainingMs = targetEnd - Date.now();
+      const remSec = Math.max(0, Math.ceil(remainingMs / 1000));
+      setRateLimitSecondsRemaining(remSec);
+      if (remSec <= 0) {
+        clearInterval(cooldownIntervalRef.current);
+        cooldownIntervalRef.current = null;
+        recentSendTimestampsRef.current = [];
+      }
+    }, 200);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+      }
+    };
+  }, []);
 
   const sendPacket = useCallback((packet: ClientMessage) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -153,10 +189,10 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
             setNameConflict(null);
             setIsWaitingApproval(false);
             setJoinDeniedReason(null);
-            setIsOwner(Boolean(data.isOwner));
-            setOwnerId(data.ownerId || null);
-            setIsRoomLocked(Boolean(data.isLocked));
-            setPendingJoinRequests(data.pendingRequests || []);
+            setIsOwner(!isGlobal && Boolean(data.isOwner));
+            setOwnerId(isGlobal ? null : (data.ownerId || null));
+            setIsRoomLocked(!isGlobal && Boolean(data.isLocked));
+            setPendingJoinRequests(!isGlobal ? (data.pendingRequests || []) : []);
             const initialMsgs = (data.messages || []).filter(
               (m: Message) => !(m.isSystem && m.text === `${currentUser.name} joined the room`)
             );
@@ -170,12 +206,14 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
           }
 
           case "join_requested": {
+            if (isGlobal) break;
             setIsWaitingApproval(true);
             setJoinDeniedReason(null);
             break;
           }
 
           case "join_denied": {
+            if (isGlobal) break;
             setIsWaitingApproval(false);
             setJoinDeniedReason(data.message || "Host declined your request to join.");
             setStatus("disconnected");
@@ -183,14 +221,20 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
           }
 
           case "room_lock_changed": {
+            if (isGlobal) break;
             setIsRoomLocked(data.locked);
             setOwnerId(data.ownerId || null);
             break;
           }
 
           case "owner_changed": {
-            setOwnerId(data.ownerId || null);
-            setIsOwner(data.ownerId === currentUser.id);
+            if (isGlobal) {
+              setOwnerId(null);
+              setIsOwner(false);
+            } else {
+              setOwnerId(data.ownerId || null);
+              setIsOwner(data.ownerId === currentUser.id);
+            }
             break;
           }
 
@@ -210,6 +254,16 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
           case "kicked": {
             setKickedReason(data.message || "You were removed from the room by the host.");
             setStatus("disconnected");
+            break;
+          }
+
+          case "rate_limited": {
+            const rawRetry = data.retryAfter ?? 4000;
+            const retrySecs = Math.max(
+              1,
+              Math.round(rawRetry > 100 ? rawRetry / 1000 : rawRetry)
+            );
+            startRateLimitCooldown(retrySecs);
             break;
           }
 
@@ -449,6 +503,19 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
       gifUrl?: string;
       replyTo?: ReplyReference;
     }) => {
+      if (rateLimitSecondsRemaining > 0) {
+        return;
+      }
+
+      const now = Date.now();
+      const windowStart = now - 3500;
+      recentSendTimestampsRef.current = recentSendTimestampsRef.current.filter((t) => t > windowStart);
+      if (recentSendTimestampsRef.current.length >= 4) {
+        startRateLimitCooldown(4);
+        return;
+      }
+      recentSendTimestampsRef.current.push(now);
+
       const tempId = crypto.randomUUID();
       const user = currentUserRef.current;
 
@@ -479,7 +546,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
         replyTo,
       });
     },
-    [roomId, sendPacket]
+    [roomId, sendPacket, rateLimitSecondsRemaining, startRateLimitCooldown]
   );
 
   const markAsRead = useCallback(
@@ -549,6 +616,13 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
 
   const sendTyping = useCallback(
     (isTyping: boolean) => {
+      const now = Date.now();
+      if (isTyping) {
+        if (now - lastTypingSentRef.current < 500) {
+          return;
+        }
+        lastTypingSentRef.current = now;
+      }
       sendPacket({
         type: "typing",
         isTyping,
@@ -652,6 +726,7 @@ export function useChatRoom({ roomId, currentUser, onNewMessage }: UseChatRoomOp
     markAsRead,
     sendTyping,
     updateProfile,
+    rateLimitSecondsRemaining,
     reconnect: connect,
   };
 }
