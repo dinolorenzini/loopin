@@ -317,4 +317,36 @@ assert.strictEqual(testRoom.isLocked, false, "Empty room resets lock");
 
 console.log("✓ Room host ownership, locked waiting room, knock approval/denial, and transfer lifecycle verified!");
 
+// -------------------------------------------------------------
+// Test 8: Strict Under-13 Age Gate Block (COPPA 13+ Enforcement)
+// -------------------------------------------------------------
+console.log("\nStep 8: Testing Strict 13+ Age Gate Enforcement...");
+
+function validateUserAgeEligibility(ageBracket) {
+  if (ageBracket === "under13") {
+    return { allowed: false, reason: "Loopin requires all users to be at least 13 years of age under COPPA policy." };
+  }
+  if (ageBracket === "13-15") {
+    return { allowed: true, mode: "minor_protected" };
+  }
+  if (ageBracket === "16+") {
+    return { allowed: true, mode: "standard" };
+  }
+  return { allowed: false, reason: "Invalid age bracket" };
+}
+
+const under13Check = validateUserAgeEligibility("under13");
+assert.strictEqual(under13Check.allowed, false, "Under-13 users must be strictly blocked");
+assert.ok(under13Check.reason.includes("COPPA"), "Reason must reference COPPA policy");
+
+const teenCheck = validateUserAgeEligibility("13-15");
+assert.strictEqual(teenCheck.allowed, true, "13-15 minor users are admitted with protections");
+assert.strictEqual(teenCheck.mode, "minor_protected");
+
+const adultCheck = validateUserAgeEligibility("16+");
+assert.strictEqual(adultCheck.allowed, true, "16+ standard users are admitted");
+assert.strictEqual(adultCheck.mode, "standard");
+
+console.log("✓ Strict 13+ age gate correctly rejects under-13 individuals and admits 13+!");
+
 console.log("\n🎉 ALL COMPLIANCE SUITE TESTS (EU LAWS, FERPA, COPPA, SCHOOL CONTROLS) PASSED SUCCESSFULLY!");

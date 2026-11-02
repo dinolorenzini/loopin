@@ -209,18 +209,6 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
 
         <div className="home-top-bar-right">
-          {onOpenSchools && (
-            <button
-              type="button"
-              className="btn-schools-badge"
-              onClick={onOpenSchools}
-              title="Learn how Loopin is built for schools & student safety"
-            >
-              <GraduationCap size={15} className="text-accent" />
-              <span>For School Admins</span>
-            </button>
-          )}
-
           <button
             type="button"
             className="header-icon-btn"
@@ -287,11 +275,10 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <div className="home-footer-schools-row">
                   <button
                     type="button"
-                    className="home-schools-footer-link"
+                    className="home-schools-compact-link"
                     onClick={onOpenSchools}
                   >
-                    <GraduationCap size={13} />
-                    <span>For School Admins &bull; Safe Student Collaboration Guide</span>
+                    <span>For School Admins &rarr;</span>
                   </button>
                 </div>
               )}

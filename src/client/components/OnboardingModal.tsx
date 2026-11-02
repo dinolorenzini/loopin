@@ -27,7 +27,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   onComplete,
 }) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [step, setStep] = useState<"age_gate" | "identity">(() => {
+  const [step, setStep] = useState<"age_gate" | "identity" | "blocked_under13">(() => {
     return getUserAgeBracket() ? "identity" : "age_gate";
   });
   const [ageBracket, setAgeBracket] = useState<AgeBracket>(() => {
@@ -61,17 +61,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   }, [isOpen, currentUser]);
 
   const handleSelectAge = (bracket: AgeBracket) => {
+    if (bracket === "under13") {
+      setStep("blocked_under13");
+      return;
+    }
     setAgeBracket(bracket);
     setUserAgeBracket(bracket);
-    const childActive = bracket === "under13";
-    setIsChildMode(childActive);
-
-    // If child mode, generate a child-safe animal name
-    if (childActive) {
-      const safeName = generateChildSafeName().slice(0, 16);
-      setName(safeName);
-    }
-
+    setIsChildMode(false);
     setStep("identity");
   };
 
@@ -136,27 +132,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             <div className="age-gate-callout">
               <ShieldCheck size={18} className="text-accent" />
               <span>
-                To ensure compliance with <strong>COPPA</strong> and <strong>EU Digital Consent Laws</strong>, please select your age bracket. Loopin provides customized privacy safeguards for children and minors.
+                To ensure compliance with <strong>COPPA</strong> and <strong>EU Digital Consent Laws</strong>, please select your age bracket. Loopin requires all users to be at least 13 years old.
               </span>
             </div>
 
             <p className="age-gate-label">Please select your age:</p>
 
             <div className="age-options-grid">
-              <button
-                type="button"
-                className="age-option-card"
-                onClick={() => handleSelectAge("under13")}
-              >
-                <div className="age-card-icon-wrap child-badge">
-                  <Sparkles size={20} />
-                </div>
-                <div className="age-card-text">
-                  <span className="age-card-title">Under 13 Years Old</span>
-                  <span className="age-card-sub">COPPA Child-Safe Mode &bull; Auto-generated aliases &bull; Zero photo uploads</span>
-                </div>
-              </button>
-
               <button
                 type="button"
                 className="age-option-card"
@@ -167,7 +149,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 </div>
                 <div className="age-card-text">
                   <span className="age-card-title">13 to 15 Years Old</span>
-                  <span className="age-card-sub">EU Minor Safeguards &bull; PII leak alerts &bull; Privacy-first browsing</span>
+                  <span className="age-card-sub">Minor Safeguards &bull; PII leak alerts &bull; Privacy-first collaboration</span>
                 </div>
               </button>
 
@@ -183,6 +165,42 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                   <span className="age-card-title">16 Years or Older</span>
                   <span className="age-card-sub">Standard Mode &bull; Ephemeral volatile RAM &bull; Full customization</span>
                 </div>
+              </button>
+
+              <button
+                type="button"
+                className="age-option-card age-option-blocked"
+                onClick={() => handleSelectAge("under13")}
+              >
+                <div className="age-card-icon-wrap child-badge">
+                  <ShieldAlert size={20} />
+                </div>
+                <div className="age-card-text">
+                  <span className="age-card-title">Under 13 Years Old</span>
+                  <span className="age-card-sub">Not permitted on Loopin (Strict COPPA Policy)</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP: BLOCKED UNDER 13 (COPPA RESTRICTION) */}
+        {step === "blocked_under13" && (
+          <div className="onboarding-blocked-step">
+            <div className="blocked-icon-box">
+              <ShieldAlert size={44} className="text-danger" />
+            </div>
+            <h3 className="blocked-title">Age Requirement Not Met</h3>
+            <p className="blocked-desc">
+              Loopin requires all users to be at least <strong>13 years of age</strong>. To comply with the Children&apos;s Online Privacy Protection Act (COPPA), children under 13 are not permitted to use this service.
+            </p>
+            <div className="blocked-actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setStep("age_gate")}
+              >
+                <span>&larr; I made a mistake, select again</span>
               </button>
             </div>
           </div>

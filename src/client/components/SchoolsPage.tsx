@@ -5,6 +5,8 @@ import {
   Lock,
   Users,
   CheckCircle2,
+  XCircle,
+  AlertTriangle,
   ArrowRight,
   ArrowLeft,
   Sparkles,
@@ -16,6 +18,7 @@ import {
   Download,
   AlertCircle,
   ExternalLink,
+  ShieldAlert,
 } from "lucide-react";
 import { LoopinLogo } from "./LoopinLogo";
 
@@ -84,8 +87,8 @@ export const SchoolsPage: React.FC<SchoolsPageProps> = ({
       <main className="schools-main-scroll">
         <div className="schools-hero-section">
           <div className="schools-hero-badge">
-            <GraduationCap size={16} className="text-accent" />
-            <span>FERPA &amp; COPPA Compliant &bull; 100% Ephemeral</span>
+            <ShieldCheck size={15} className="text-accent" />
+            <span>FERPA Compliant &bull; Strictly 13+ &bull; 100% Ephemeral</span>
           </div>
 
           <h1 className="schools-hero-title">
@@ -180,11 +183,11 @@ export const SchoolsPage: React.FC<SchoolsPageProps> = ({
             {/* Pillar 4 */}
             <div className="pillar-card">
               <div className="pillar-icon-box">
-                <Sparkles size={24} className="text-accent" />
+                <ShieldAlert size={24} className="text-accent" />
               </div>
-              <h3 className="pillar-title">COPPA Child Safety (Under 13)</h3>
+              <h3 className="pillar-title">Strict Age Gating (13+ Only)</h3>
               <p className="pillar-body">
-                Complies with FTC COPPA Rule (16 CFR Part 312). Elementary and middle school students under 13 use algorithmic animal aliases (e.g. <em>SunnyPanda-42</em>), locking out accidental real name disclosures. Photo uploads and external tracking media are automatically disabled.
+                Loopin strictly prohibits users under 13 from using the platform. Designed specifically for high schools, colleges, and students 13 and older, eliminating COPPA exposure and protecting school districts from parental consent liabilities.
               </p>
             </div>
 
@@ -232,39 +235,39 @@ export const SchoolsPage: React.FC<SchoolsPageProps> = ({
               <tbody>
                 <tr>
                   <td><strong>FERPA School Official Exception</strong></td>
-                  <td className="table-highlight"><CheckCircle2 size={16} className="text-accent" /> Fully Compliant</td>
-                  <td>❌ Non-Compliant</td>
-                  <td>❌ Non-Compliant</td>
+                  <td className="table-highlight"><span className="table-status status-good"><CheckCircle2 size={15} /> Fully Compliant</span></td>
+                  <td><span className="table-status status-bad"><XCircle size={15} /> Non-Compliant</span></td>
+                  <td><span className="table-status status-bad"><XCircle size={15} /> Non-Compliant</span></td>
                 </tr>
                 <tr>
                   <td><strong>Protects Student Phone Numbers</strong></td>
-                  <td className="table-highlight"><CheckCircle2 size={16} className="text-accent" /> Zero Phone PII</td>
-                  <td>⚠️ Exposes Handles</td>
-                  <td>❌ Discloses Phone #</td>
+                  <td className="table-highlight"><span className="table-status status-good"><CheckCircle2 size={15} /> Zero Phone PII</span></td>
+                  <td><span className="table-status status-warn"><AlertTriangle size={15} /> Exposes Handles</span></td>
+                  <td><span className="table-status status-bad"><XCircle size={15} /> Discloses Phone #</span></td>
                 </tr>
                 <tr>
                   <td><strong>Automatic Room Ephemeral Wipe</strong></td>
-                  <td className="table-highlight"><CheckCircle2 size={16} className="text-accent" /> Instant on Exit</td>
-                  <td>❌ Permanent Logs</td>
-                  <td>❌ Stored on Device</td>
+                  <td className="table-highlight"><span className="table-status status-good"><CheckCircle2 size={15} /> Instant on Exit</span></td>
+                  <td><span className="table-status status-bad"><XCircle size={15} /> Permanent Logs</span></td>
+                  <td><span className="table-status status-bad"><XCircle size={15} /> Stored on Device</span></td>
                 </tr>
                 <tr>
                   <td><strong>Teacher Waiting Room (Knock)</strong></td>
-                  <td className="table-highlight"><CheckCircle2 size={16} className="text-accent" /> Built-in 1-Click</td>
-                  <td>⚠️ Complex Roles</td>
-                  <td>❌ No Approval Gate</td>
+                  <td className="table-highlight"><span className="table-status status-good"><CheckCircle2 size={15} /> Built-in 1-Click</span></td>
+                  <td><span className="table-status status-warn"><AlertTriangle size={15} /> Complex Roles</span></td>
+                  <td><span className="table-status status-bad"><XCircle size={15} /> No Approval Gate</span></td>
                 </tr>
                 <tr>
                   <td><strong>Student Accounts Required</strong></td>
-                  <td className="table-highlight"><CheckCircle2 size={16} className="text-accent" /> Zero Accounts</td>
-                  <td>❌ Email/Password Needed</td>
-                  <td>❌ Phone SIM Needed</td>
+                  <td className="table-highlight"><span className="table-status status-good"><CheckCircle2 size={15} /> Zero Accounts</span></td>
+                  <td><span className="table-status status-bad"><XCircle size={15} /> Email/Password Needed</span></td>
+                  <td><span className="table-status status-bad"><XCircle size={15} /> Phone SIM Needed</span></td>
                 </tr>
                 <tr>
                   <td><strong>Chromebook &amp; iPad Native</strong></td>
-                  <td className="table-highlight"><CheckCircle2 size={16} className="text-accent" /> Instant Web App</td>
-                  <td>⚠️ Heavy Resource Use</td>
-                  <td>❌ Mobile Only</td>
+                  <td className="table-highlight"><span className="table-status status-good"><CheckCircle2 size={15} /> Instant Web App</span></td>
+                  <td><span className="table-status status-warn"><AlertTriangle size={15} /> Heavy Resource Use</span></td>
+                  <td><span className="table-status status-bad"><XCircle size={15} /> Mobile Only</span></td>
                 </tr>
               </tbody>
             </table>
@@ -299,7 +302,7 @@ export const SchoolsPage: React.FC<SchoolsPageProps> = ({
             <div className="faq-card">
               <h3 className="faq-q">Can students access external or unrated GIFs and distractions?</h3>
               <p className="faq-a">
-                In Educational Mode (and for child accounts), external GIF search engines (GIPHY/Tenor) are disabled, keeping discussions focused and free of unmonitored media.
+                In Educational Mode, external GIF search engines (GIPHY/Tenor) are disabled, keeping classroom discussions focused, fast, and free of unmonitored external media.
               </p>
             </div>
           </div>
