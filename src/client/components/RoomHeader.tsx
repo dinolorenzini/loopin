@@ -137,7 +137,9 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
                 <Share2 size={13} />
               </button>
             )}
+          </div>
 
+          <div className="header-badges-row">
             {isCoppaChildMode() && (
               <span className="compliance-header-tag tag-coppa" title="Under-13 Child-Safe Mode Active (COPPA Compliant)">
                 <ShieldCheck size={12} />
@@ -166,7 +168,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
                 title={isRoomLocked ? "Room is locked. Click to allow direct joins." : "Room is open. Click to require permission to join."}
                 aria-label={isRoomLocked ? "Unlock room" : "Lock room"}
               >
-                {isRoomLocked ? <Lock size={13} /> : <Unlock size={13} />}
+                {isRoomLocked ? <Lock size={12} /> : <Unlock size={12} />}
                 <span>{isRoomLocked ? "Locked" : "Open"}</span>
               </button>
             )}
@@ -185,7 +187,7 @@ export const RoomHeader: React.FC<RoomHeaderProps> = ({
                 onClick={onOpenKnockRequests}
                 title={`${pendingRequestsCount} participant(s) waiting to enter`}
               >
-                <UserCheck size={13} />
+                <UserCheck size={12} />
                 <span>{pendingRequestsCount} Waiting</span>
               </button>
             )}

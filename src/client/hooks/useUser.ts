@@ -37,37 +37,51 @@ export function generateChildSafeName(): string {
 
 export function getUserAgeBracket(): AgeBracket | null {
   if (typeof window === "undefined") return null;
-  const bracket = localStorage.getItem("loopin_age_bracket");
-  if (bracket === "under13" || bracket === "13-15" || bracket === "16+") {
-    return bracket as AgeBracket;
-  }
+  try {
+    const bracket = localStorage.getItem("loopin_age_bracket");
+    if (bracket === "under13" || bracket === "13-15" || bracket === "16+") {
+      return bracket as AgeBracket;
+    }
+  } catch {}
   return null;
 }
 
 export function setUserAgeBracket(bracket: AgeBracket): void {
   if (typeof window !== "undefined") {
-    localStorage.setItem("loopin_age_bracket", bracket);
-    if (bracket === "under13") {
-      localStorage.setItem("loopin_coppa_mode", "true");
-    } else {
-      localStorage.removeItem("loopin_coppa_mode");
-    }
+    try {
+      localStorage.setItem("loopin_age_bracket", bracket);
+      if (bracket === "under13") {
+        localStorage.setItem("loopin_coppa_mode", "true");
+      } else {
+        localStorage.removeItem("loopin_coppa_mode");
+      }
+    } catch {}
   }
 }
 
 export function isCoppaChildMode(): boolean {
   if (typeof window === "undefined") return false;
-  return localStorage.getItem("loopin_coppa_mode") === "true";
+  try {
+    return localStorage.getItem("loopin_coppa_mode") === "true";
+  } catch {
+    return false;
+  }
 }
 
 export function isUserOnboarded(): boolean {
   if (typeof window === "undefined") return true;
-  return localStorage.getItem("loopin_has_onboarded") === "true";
+  try {
+    return localStorage.getItem("loopin_has_onboarded") === "true";
+  } catch {
+    return true;
+  }
 }
 
 export function markUserOnboarded(): void {
   if (typeof window !== "undefined") {
-    localStorage.setItem("loopin_has_onboarded", "true");
+    try {
+      localStorage.setItem("loopin_has_onboarded", "true");
+    } catch {}
   }
 }
 

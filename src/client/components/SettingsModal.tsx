@@ -38,6 +38,46 @@ import { USER_COLORS, isCoppaChildMode, getUserAgeBracket } from "../hooks/useUs
 import { ChatBackground } from "./ChatBackground";
 import { LegalModal, type LegalDocType } from "./LegalModal";
 import type { User } from "../../server/types";
+import { DEFAULT_CONSENT } from "../types/compliance";
+
+class TabErrorBoundary extends React.Component<
+  { children: React.ReactNode; tabName: string },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; tabName: string }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("Settings tab render error:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="tab-error-fallback" style={{ padding: "2rem", textAlign: "center" }}>
+          <AlertTriangle size={28} className="text-danger" style={{ margin: "0 auto 12px" }} />
+          <h4 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+            Could not render {this.props.tabName}
+          </h4>
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "16px" }}>
+            {this.state.error?.message || "An unexpected error occurred while displaying this section."}
+          </p>
+          <button
+            type="button"
+            className="btn-neutral-outline"
+            onClick={() => this.setState({ hasError: false, error: null })}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -136,6 +176,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     saveConsent,
     exportAllUserData,
   } = useSettings();
+
+  const safeConsent = consent && typeof consent === "object" ? consent : DEFAULT_CONSENT;
 
   const [activeTab, setActiveTab] = useState<SettingsCategory>(() => {
     return initialCategory || settings.activeCategory || "appearance";
@@ -1120,279 +1162,281 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* 7. PRIVACY & COMPLIANCE */}
             {activeTab === "privacy" && (
-              <div className="settings-category-view">
-                {/* Active Compliance Mode Status */}
-                <div className="compliance-status-banner">
-                  <div className="status-banner-icon">
-                    {isCoppaChildMode() ? (
-                      <Sparkles size={20} className="text-accent" />
-                    ) : settings.ferpaMode ? (
-                      <GraduationCap size={20} className="text-accent" />
-                    ) : (
-                      <Shield size={20} className="text-accent" />
-                    )}
-                  </div>
-                  <div className="status-banner-text">
-                    <span className="status-banner-title">
-                      {isCoppaChildMode()
-                        ? "COPPA Child-Safe Mode Active"
-                        : settings.ferpaMode
-                        ? "FERPA Classroom Mode Active"
-                        : "Standard Privacy Mode (GDPR & ePrivacy Compliant)"}
-                    </span>
-                    <span className="status-banner-desc">
-                      {isCoppaChildMode()
-                        ? "Protected under 16 CFR Part 312. Pre-screened animal alias active, photo uploads disabled, and zero advertising profiling."
-                        : settings.ferpaMode
-                        ? "Protected under 34 CFR Part 99. External unvetted media suppressed, student PII filtered, zero permanent records."
-                        : "All room communications reside strictly in volatile edge RAM. Zero tracking cookies, zero persistent databases."}
-                    </span>
-                  </div>
-                </div>
-
-                {/* FERPA Mode Toggle */}
-                <div className="pane-section">
-                  <h3 className="section-title">Educational &amp; Institutional Safeguards</h3>
-                  <p className="section-desc">Configure classroom protection rules for schools, universities, and student breakout groups.</p>
-                  
-                  <div className="settings-toggle-row">
-                    <div className="toggle-label-wrap">
-                      <span className="toggle-title">FERPA Classroom Mode (34 CFR &sect; 99.31)</span>
-                      <span className="toggle-subtitle">
-                        Suppresses external unvetted GIF queries, warns on student directory info leaks, and enforces student data isolation.
+              <TabErrorBoundary tabName="Privacy &amp; Data">
+                <div className="settings-category-view">
+                  {/* Active Compliance Mode Status */}
+                  <div className="compliance-status-banner">
+                    <div className="status-banner-icon">
+                      {isCoppaChildMode() ? (
+                        <Sparkles size={20} className="text-accent" />
+                      ) : settings.ferpaMode ? (
+                        <GraduationCap size={20} className="text-accent" />
+                      ) : (
+                        <Shield size={20} className="text-accent" />
+                      )}
+                    </div>
+                    <div className="status-banner-text">
+                      <span className="status-banner-title">
+                        {isCoppaChildMode()
+                          ? "COPPA Child-Safe Mode Active"
+                          : settings.ferpaMode
+                          ? "FERPA Classroom Mode Active"
+                          : "Standard Privacy Mode (GDPR & ePrivacy Compliant)"}
+                      </span>
+                      <span className="status-banner-desc">
+                        {isCoppaChildMode()
+                          ? "Protected under 16 CFR Part 312. Pre-screened animal alias active, photo uploads disabled, and zero advertising profiling."
+                          : settings.ferpaMode
+                          ? "Protected under 34 CFR Part 99. External unvetted media suppressed, student PII filtered, zero permanent records."
+                          : "All room communications reside strictly in volatile edge RAM. Zero tracking cookies, zero persistent databases."}
                       </span>
                     </div>
-                    <label className="switch-toggle" aria-label="Toggle FERPA Classroom Mode">
-                      <input
-                        type="checkbox"
-                        checked={settings.ferpaMode}
-                        onChange={(e) => updateSetting("ferpaMode", e.target.checked)}
-                      />
-                      <span className="switch-slider" />
-                    </label>
-                  </div>
-                </div>
-
-                {/* GDPR Data Subject Rights (Articles 15, 17, 20) */}
-                <div className="pane-section">
-                  <h3 className="section-title">Your Data Rights (GDPR &amp; CCPA)</h3>
-                  <p className="section-desc">Exercise your rights to data portability, storage preference management, and complete erasure.</p>
-
-                  <div className="gdpr-rights-cards-grid">
-                    {/* Art 20: Portability / Export */}
-                    <div className="gdpr-card">
-                      <div className="gdpr-card-info">
-                        <Download size={16} className="text-accent" />
-                        <div>
-                          <span className="gdpr-card-title">Export My Data (GDPR Art. 20)</span>
-                          <span className="gdpr-card-sub">Download a JSON record of all client settings, consent logs, and recent rooms.</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-neutral-outline"
-                        onClick={exportAllUserData}
-                      >
-                        <Download size={14} />
-                        <span>Export JSON</span>
-                      </button>
-                    </div>
-
-                    {/* ePrivacy: Consent Preferences */}
-                    <div className="gdpr-card">
-                      <div className="gdpr-card-info">
-                        <Cookie size={16} className="text-accent" />
-                        <div>
-                          <span className="gdpr-card-title">Storage Consent (ePrivacy)</span>
-                          <span className="gdpr-card-sub">
-                            Preferences: {consent.preferences ? "Allowed" : "Blocked"} &bull; History: {consent.history ? "Allowed" : "Blocked"}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-neutral-outline"
-                        onClick={() => {
-                          saveConsent({
-                            necessary: true,
-                            preferences: !consent.preferences,
-                            history: !consent.history,
-                          });
-                        }}
-                      >
-                        Toggle Non-Essential
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Legal & Compliance Center Documents */}
-                <div className="pane-section">
-                  <h3 className="section-title">Legal &amp; Regulatory Documentation</h3>
-                  <p className="section-desc">Review our transparent ephemeral chat policies, institutional agreements, and compliance notices.</p>
-                  <div className="legal-doc-cards-grid">
-                    <div className="legal-doc-card">
-                      <div className="legal-doc-card-info">
-                        <FileText size={16} className="text-accent" />
-                        <div>
-                          <span className="legal-doc-card-title">Terms of Service</span>
-                          <span className="legal-doc-card-sub">Acceptable use, volatility, and disclaimers</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-neutral-outline"
-                        onClick={() => {
-                          setLegalDocType("tos");
-                          setIsLegalOpen(true);
-                        }}
-                      >
-                        Read Terms
-                      </button>
-                    </div>
-
-                    <div className="legal-doc-card">
-                      <div className="legal-doc-card-info">
-                        <Shield size={16} className="text-accent" />
-                        <div>
-                          <span className="legal-doc-card-title">Privacy Policy (GDPR)</span>
-                          <span className="legal-doc-card-sub">Articles 12-14, DPO contact, and SCC transfers</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-neutral-outline"
-                        onClick={() => {
-                          setLegalDocType("privacy");
-                          setIsLegalOpen(true);
-                        }}
-                      >
-                        Read Policy
-                      </button>
-                    </div>
-
-                    <div className="legal-doc-card">
-                      <div className="legal-doc-card-info">
-                        <Globe size={16} className="text-accent" />
-                        <div>
-                          <span className="legal-doc-card-title">EU Laws &amp; DSA</span>
-                          <span className="legal-doc-card-sub">Digital Services Act Art. 16 Notice &amp; Action</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-neutral-outline"
-                        onClick={() => {
-                          setLegalDocType("eu_dsa");
-                          setIsLegalOpen(true);
-                        }}
-                      >
-                        Read DSA
-                      </button>
-                    </div>
-
-                    <div className="legal-doc-card">
-                      <div className="legal-doc-card-info">
-                        <GraduationCap size={16} className="text-accent" />
-                        <div>
-                          <span className="legal-doc-card-title">FERPA (Schools)</span>
-                          <span className="legal-doc-card-sub">34 CFR &sect; 99.31 School Official Exception</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-neutral-outline"
-                        onClick={() => {
-                          setLegalDocType("ferpa");
-                          setIsLegalOpen(true);
-                        }}
-                      >
-                        Read FERPA
-                      </button>
-                    </div>
-
-                    <div className="legal-doc-card">
-                      <div className="legal-doc-card-info">
-                        <Sparkles size={16} className="text-accent" />
-                        <div>
-                          <span className="legal-doc-card-title">COPPA Notice</span>
-                          <span className="legal-doc-card-sub">16 CFR Part 312 disclosures for parents</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-neutral-outline"
-                        onClick={() => {
-                          setLegalDocType("coppa");
-                          setIsLegalOpen(true);
-                        }}
-                      >
-                        Read COPPA
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Local Storage & Wipe */}
-                <div className="pane-section">
-                  <h3 className="section-title">Device Storage Management</h3>
-                  <p className="section-desc">Client data saved locally in your browser&rsquo;s <code>localStorage</code>:</p>
-
-                  <div className="storage-items-list">
-                    <div className="storage-item-row">
-                      <span className="storage-item-key">loopin_user_name</span>
-                      <span className="storage-item-desc">Your display name or child-safe alias</span>
-                    </div>
-                    <div className="storage-item-row">
-                      <span className="storage-item-key">loopin_settings_v4</span>
-                      <span className="storage-item-desc">Themes, shader settings, FERPA mode, and audio preferences</span>
-                    </div>
-                    <div className="storage-item-row">
-                      <span className="storage-item-key">loopin_recent_rooms</span>
-                      <span className="storage-item-desc">Shortcuts to your recently visited rooms</span>
-                    </div>
-                    <div className="storage-item-row">
-                      <span className="storage-item-key">loopin_consent_v1</span>
-                      <span className="storage-item-desc">Your ePrivacy and GDPR storage consent preferences</span>
-                    </div>
                   </div>
 
-                  <div className="storage-danger-zone">
-                    {confirmClear ? (
-                      <div className="confirm-wipe-card">
-                        <AlertTriangle size={16} className="text-danger" />
-                        <span className="confirm-wipe-text">
-                          Clear all stored nicknames, settings, and room shortcuts on this browser?
+                  {/* FERPA Mode Toggle */}
+                  <div className="pane-section">
+                    <h3 className="section-title">Educational &amp; Institutional Safeguards</h3>
+                    <p className="section-desc">Configure classroom protection rules for schools, universities, and student breakout groups.</p>
+                    
+                    <div className="settings-toggle-row">
+                      <div className="toggle-label-wrap">
+                        <span className="toggle-title">FERPA Classroom Mode (34 CFR &sect; 99.31)</span>
+                        <span className="toggle-subtitle">
+                          Suppresses external unvetted GIF queries, warns on student directory info leaks, and enforces student data isolation.
                         </span>
-                        <div className="confirm-wipe-actions">
-                          <button
-                            type="button"
-                            className="btn-neutral-outline"
-                            onClick={() => setConfirmClear(false)}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-danger-solid"
-                            onClick={clearAllData}
-                          >
-                            Yes, wipe local data
-                          </button>
-                        </div>
                       </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn-neutral-outline btn-wipe-data"
-                        onClick={() => setConfirmClear(true)}
-                      >
-                        <Trash2 size={14} /> Clear all local data (GDPR Art. 17)
-                      </button>
-                    )}
+                      <label className="switch-toggle" aria-label="Toggle FERPA Classroom Mode">
+                        <input
+                          type="checkbox"
+                          checked={settings.ferpaMode}
+                          onChange={(e) => updateSetting("ferpaMode", e.target.checked)}
+                        />
+                        <span className="switch-slider" />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* GDPR Data Subject Rights (Articles 15, 17, 20) */}
+                  <div className="pane-section">
+                    <h3 className="section-title">Your Data Rights (GDPR &amp; CCPA)</h3>
+                    <p className="section-desc">Exercise your rights to data portability, storage preference management, and complete erasure.</p>
+
+                    <div className="gdpr-rights-cards-grid">
+                      {/* Art 20: Portability / Export */}
+                      <div className="gdpr-card">
+                        <div className="gdpr-card-info">
+                          <Download size={16} className="text-accent" />
+                          <div>
+                            <span className="gdpr-card-title">Export My Data (GDPR Art. 20)</span>
+                            <span className="gdpr-card-sub">Download a JSON record of all client settings, consent logs, and recent rooms.</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-neutral-outline"
+                          onClick={exportAllUserData}
+                        >
+                          <Download size={14} />
+                          <span>Export JSON</span>
+                        </button>
+                      </div>
+
+                      {/* ePrivacy: Consent Preferences */}
+                      <div className="gdpr-card">
+                        <div className="gdpr-card-info">
+                          <Cookie size={16} className="text-accent" />
+                          <div>
+                            <span className="gdpr-card-title">Storage Consent (ePrivacy)</span>
+                            <span className="gdpr-card-sub">
+                              Preferences: {safeConsent.preferences ? "Allowed" : "Blocked"} &bull; History: {safeConsent.history ? "Allowed" : "Blocked"}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-neutral-outline"
+                          onClick={() => {
+                            saveConsent({
+                              necessary: true,
+                              preferences: !safeConsent.preferences,
+                              history: !safeConsent.history,
+                            });
+                          }}
+                        >
+                          Toggle Non-Essential
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Legal & Compliance Center Documents */}
+                  <div className="pane-section">
+                    <h3 className="section-title">Legal &amp; Regulatory Documentation</h3>
+                    <p className="section-desc">Review our transparent ephemeral chat policies, institutional agreements, and compliance notices.</p>
+                    <div className="legal-doc-cards-grid">
+                      <div className="legal-doc-card">
+                        <div className="legal-doc-card-info">
+                          <FileText size={16} className="text-accent" />
+                          <div>
+                            <span className="legal-doc-card-title">Terms of Service</span>
+                            <span className="legal-doc-card-sub">Acceptable use, volatility, and disclaimers</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-neutral-outline"
+                          onClick={() => {
+                            setLegalDocType("tos");
+                            setIsLegalOpen(true);
+                          }}
+                        >
+                          Read Terms
+                        </button>
+                      </div>
+
+                      <div className="legal-doc-card">
+                        <div className="legal-doc-card-info">
+                          <Shield size={16} className="text-accent" />
+                          <div>
+                            <span className="legal-doc-card-title">Privacy Policy (GDPR)</span>
+                            <span className="legal-doc-card-sub">Articles 12-14, DPO contact, and SCC transfers</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-neutral-outline"
+                          onClick={() => {
+                            setLegalDocType("privacy");
+                            setIsLegalOpen(true);
+                          }}
+                        >
+                          Read Policy
+                        </button>
+                      </div>
+
+                      <div className="legal-doc-card">
+                        <div className="legal-doc-card-info">
+                          <Globe size={16} className="text-accent" />
+                          <div>
+                            <span className="legal-doc-card-title">EU Laws &amp; DSA</span>
+                            <span className="legal-doc-card-sub">Digital Services Act Art. 16 Notice &amp; Action</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-neutral-outline"
+                          onClick={() => {
+                            setLegalDocType("eu_dsa");
+                            setIsLegalOpen(true);
+                          }}
+                        >
+                          Read DSA
+                        </button>
+                      </div>
+
+                      <div className="legal-doc-card">
+                        <div className="legal-doc-card-info">
+                          <GraduationCap size={16} className="text-accent" />
+                          <div>
+                            <span className="legal-doc-card-title">FERPA (Schools)</span>
+                            <span className="legal-doc-card-sub">34 CFR &sect; 99.31 School Official Exception</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-neutral-outline"
+                          onClick={() => {
+                            setLegalDocType("ferpa");
+                            setIsLegalOpen(true);
+                          }}
+                        >
+                          Read FERPA
+                        </button>
+                      </div>
+
+                      <div className="legal-doc-card">
+                        <div className="legal-doc-card-info">
+                          <Sparkles size={16} className="text-accent" />
+                          <div>
+                            <span className="legal-doc-card-title">COPPA Notice</span>
+                            <span className="legal-doc-card-sub">16 CFR Part 312 disclosures for parents</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-neutral-outline"
+                          onClick={() => {
+                            setLegalDocType("coppa");
+                            setIsLegalOpen(true);
+                          }}
+                        >
+                          Read COPPA
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Local Storage & Wipe */}
+                  <div className="pane-section">
+                    <h3 className="section-title">Device Storage Management</h3>
+                    <p className="section-desc">Client data saved locally in your browser&rsquo;s <code>localStorage</code>:</p>
+
+                    <div className="storage-items-list">
+                      <div className="storage-item-row">
+                        <span className="storage-item-key">loopin_user_name</span>
+                        <span className="storage-item-desc">Your display name or child-safe alias</span>
+                      </div>
+                      <div className="storage-item-row">
+                        <span className="storage-item-key">loopin_settings_v4</span>
+                        <span className="storage-item-desc">Themes, shader settings, FERPA mode, and audio preferences</span>
+                      </div>
+                      <div className="storage-item-row">
+                        <span className="storage-item-key">loopin_recent_rooms</span>
+                        <span className="storage-item-desc">Shortcuts to your recently visited rooms</span>
+                      </div>
+                      <div className="storage-item-row">
+                        <span className="storage-item-key">loopin_consent_v1</span>
+                        <span className="storage-item-desc">Your ePrivacy and GDPR storage consent preferences</span>
+                      </div>
+                    </div>
+
+                    <div className="storage-danger-zone">
+                      {confirmClear ? (
+                        <div className="confirm-wipe-card">
+                          <AlertTriangle size={16} className="text-danger" />
+                          <span className="confirm-wipe-text">
+                            Clear all stored nicknames, settings, and room shortcuts on this browser?
+                          </span>
+                          <div className="confirm-wipe-actions">
+                            <button
+                              type="button"
+                              className="btn-neutral-outline"
+                              onClick={() => setConfirmClear(false)}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-danger-solid"
+                              onClick={clearAllData}
+                            >
+                              Yes, wipe local data
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn-neutral-outline btn-wipe-data"
+                          onClick={() => setConfirmClear(true)}
+                        >
+                          <Trash2 size={14} /> Clear all local data (GDPR Art. 17)
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </TabErrorBoundary>
             )}
           </div>
         </div>

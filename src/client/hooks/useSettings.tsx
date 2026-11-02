@@ -428,6 +428,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     root.style.setProperty("--primary-accent", settings.themeColor);
     root.style.setProperty("--primary-accent-contrast", getAccessibleTextColor(settings.themeColor));
+    root.style.setProperty("--primary-accent-subtle", `color-mix(in srgb, ${settings.themeColor} 14%, transparent)`);
+    root.style.setProperty("--primary-accent-subtle-hover", `color-mix(in srgb, ${settings.themeColor} 24%, transparent)`);
+    root.style.setProperty("--primary-accent-border", `color-mix(in srgb, ${settings.themeColor} 32%, transparent)`);
+    root.style.setProperty("--primary-accent-border-hover", `color-mix(in srgb, ${settings.themeColor} 55%, transparent)`);
+    root.style.setProperty("--primary-accent-glow", `0 0 18px color-mix(in srgb, ${settings.themeColor} 35%, transparent)`);
+    root.style.setProperty("--primary-accent-glow-sm", `0 0 10px color-mix(in srgb, ${settings.themeColor} 30%, transparent)`);
     root.setAttribute("data-theme", settings.themeMode);
     root.setAttribute("data-message-style", settings.messageStyle);
     root.setAttribute("data-no-animations", settings.noAnimations ? "true" : "false");
@@ -522,15 +528,26 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (typeof window === "undefined") return DEFAULT_CONSENT;
     try {
       const stored = localStorage.getItem("loopin_consent_v1");
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed === "object") {
+          return {
+            ...DEFAULT_CONSENT,
+            ...parsed,
+            preferences: typeof parsed.preferences === "boolean" ? parsed.preferences : true,
+            history: typeof parsed.history === "boolean" ? parsed.history : true,
+          };
+        }
+      }
     } catch {}
     return { ...DEFAULT_CONSENT, timestamp: 0 };
   });
 
   const saveConsent = useCallback((preferences: Partial<ConsentPreferences>) => {
     setConsent((prev) => {
+      const base = prev && typeof prev === "object" ? prev : DEFAULT_CONSENT;
       const updated: ConsentPreferences = {
-        ...prev,
+        ...base,
         ...preferences,
         necessary: true,
         timestamp: Date.now(),
